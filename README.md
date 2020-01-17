@@ -7,6 +7,7 @@ package main
 
 import (
     "bytes"
+    "reflect"
     "github.com/renproject/surge"
 )
 
@@ -30,8 +31,8 @@ func main() {
     }
 
     buf := new(bytes.Buffer)
-    buf.Grow(surge.SizeHint(person))
-    if err := surge.Marshal(buf, person); err != nil {
+    buf.Grow(surge.SizeHint(alice))
+    if err := surge.Marshal(buf, alice); err != nil {
         panic(err)
     }
 
@@ -40,7 +41,7 @@ func main() {
         panic(err)
     }
 
-    if alice != aliceAgain {
+    if !reflect.DeepEqual(alice, aliceAgain) {
         panic("bad marshal or unmarshal")
     }
 }
