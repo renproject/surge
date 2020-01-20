@@ -356,63 +356,63 @@ func SizeHint(v interface{}) int {
 	case *bool:
 		return 1
 	case []bool:
-		return len(v)
+		return 4 + len(v)
 
 	case int8:
 		return 1
 	case *int8:
 		return 1
 	case []int8:
-		return len(v)
+		return 4 + len(v)
 
 	case int16:
 		return 2
 	case *int16:
 		return 2
 	case []int16:
-		return len(v) << 1
+		return 4 + len(v)<<1
 
 	case int32:
 		return 4
 	case *int32:
 		return 4
 	case []int32:
-		return len(v) << 2
+		return 4 + len(v)<<2
 
 	case int64:
 		return 8
 	case *int64:
 		return 8
 	case []int64:
-		return len(v) << 3
+		return 4 + len(v)<<3
 
 	case uint8:
 		return 1
 	case *uint8:
 		return 1
 	case []uint8:
-		return len(v)
+		return 4 + len(v)
 
 	case uint16:
 		return 2
 	case *uint16:
 		return 2
 	case []*uint16:
-		return len(v) << 1
+		return 4 + len(v)<<1
 
 	case uint32:
 		return 4
 	case *uint32:
 		return 4
 	case []*uint32:
-		return len(v) << 2
+		return 4 + len(v)<<2
 
 	case uint64:
 		return 8
 	case *uint64:
 		return 8
 	case []uint64:
-		return len(v) << 3
+		return 4 + len(v)<<3
 	}
 
 	if i, ok := v.(SizeHinter); ok {
@@ -431,6 +431,36 @@ func SizeHint(v interface{}) int {
 			sizeHint += SizeHint(valOf.Index(i).Interface())
 		}
 		return sizeHint
+
+	case reflect.Map:
+		sizeHint := 4 // Size of length prefix
+		for _, key := range valOf.MapKeys() {
+			sizeHint += SizeHint(key.Interface())
+			sizeHint += SizeHint(valOf.MapIndex(key).Interface())
+		}
+		return sizeHint
+
+	case reflect.Struct:
+		adt := make(map[uint16]struct{}, valOf.Type().NumField())
+		sizeHint := 4 // Size of length prefix
+		for i := 0; i < valOf.Type().NumField(); i++ {
+			field := valOf.Type().Field(i)
+			tagString := field.Tag.Get("surge")
+			if tagString == "" {
+				continue
+			}
+			tagInt, err := strconv.Atoi(tagString)
+			if err != nil {
+				panic(fmt.Sprintf("marshal error: `surge` tag must be an integer"))
+			}
+			if _, ok := adt[uint16(tagInt)]; ok {
+				panic(fmt.Sprintf("marshal error: `surge` tag must be unique"))
+			}
+			adt[uint16(tagInt)] = struct{}{}
+			sizeHint += 2
+			sizeHint += SizeHint(valOf.Field(i).Interface())
+		}
+		return SizeHint(adt)
 	}
 
 	panic(newErrUnsupportedSizeHintType(v))
