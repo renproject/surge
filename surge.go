@@ -30,26 +30,26 @@ type SizeHinter interface {
 //
 // An example of marshaling a scalar value:
 //
-//      x := 42
-//      data, err := surge.ToBinary(x)
-//      if err != nil {
-//          panic(err)
-//      }
-//      fmt.Printf("%x", data)
+//	x := 42
+//	data, err := surge.ToBinary(x)
+//	if err != nil {
+//		panic(err)
+//	}
+//	fmt.Printf("%x", data)
 //
 // An example of marshaling a custom struct:
 //
-//      type Point struct {
-//          X uint64 `surge:"0"`
-//          Y uint64 `surge:"1"`
-//      }
+//	type Point struct {
+//		X uint64 `surge:"0"`
+//		Y uint64 `surge:"1"`
+//	}
 //
-//      p := Point{ 13, 169 }
-//      data, err := surge.ToBinary(p)
-//      if err != nil {
-//          panic(err)
-//      }
-//      fmt.Printf("%x", data)
+//	p := Point{ 13, 169 }
+//	data, err := surge.ToBinary(p)
+//	if err != nil {
+//		panic(err)
+//	}
+//	fmt.Printf("%x", data)
 //
 func ToBinary(v interface{}) ([]byte, error) {
 	buf := new(bytes.Buffer)
@@ -63,21 +63,21 @@ func ToBinary(v interface{}) ([]byte, error) {
 //
 // An example of marshaling/unmarshaling a map:
 //
-//      xs := map[string]string{}
-//      xs["foo1"] = "bar"
-//      xs["foo2"] = "baz"
+//	xs := map[string]string{}
+//	xs["foo1"] = "bar"
+//	xs["foo2"] = "baz"
 //
-//      data, err := surge.ToBinary(xs)
-//      if err != nil {
-//          panic(err)
-//      }
+//	data, err := surge.ToBinary(xs)
+//	if err != nil {
+//		panic(err)
+//	}
 //
-//      ys := map[string]string{}
-//      if err := surge.FromBinary(&ys, data); err != nil {
-//          panic(err)
-//      }
-//      fmt.Printf("foo1: %s\n", ys["foo1"])
-//      fmt.Printf("foo2: %s\n", ys["foo2"])
+//	ys := map[string]string{}
+//	if err := surge.FromBinary(&ys, data); err != nil {
+//		panic(err)
+//	}
+//	fmt.Printf("foo1: %s\n", ys["foo1"])
+//	fmt.Printf("foo2: %s\n", ys["foo2"])
 //
 func FromBinary(v interface{}, data []byte) error {
 	buf := bytes.NewBuffer(data)
