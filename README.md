@@ -1,6 +1,15 @@
-# `surge`
+# `🔌 surge`
 
-A library for fast binary (un)marshaling.
+A library for fast binary (un)marshaling. Designed to be used in Byzantine networks, `🔌 surge` never explicitly panics. It supports the (un)marshaling of:
+
+- [x] scalars,
+- [x] arrays,
+- [x] slices,
+- [x] maps,
+- [x] custom structs (using the ``surge:`` tag), and
+- [x] custom implementations (using the `Marshaler` and `Unmarshaler` interfaces).
+
+Example:
 
 ```go
 package main
@@ -12,37 +21,38 @@ import (
 )
 
 type Person struct {
-    Name    string   `surge:"0"`
-    Age     uint64   `surge:"1"`
-    Friends []Person `surge:"2"`
+    Name    string            `surge:"0"`
+    Age     uint64            `surge:"1"`
+    Friends map[string]Person `surge:"2"`
 }
 
 func main() {
     alice := Person{
-        Name: "Alice",
-        Age: 25,
-        Friends: []Person{
-            Person{
-                Name: "Bob",
-                Age: 26,
-                Friends: []Person{},
+        Name:    "Alice",
+        Age:     25,
+        Friends: map[string]Person{
+            "Bob": Person{
+                Name:   "Bob",
+                Age:     26,
+                Friends: map[string]Person{},
             },
         },
     }
 
-    buf := new(bytes.Buffer)
-    buf.Grow(surge.SizeHint(alice))
-    if err := surge.Marshal(buf, alice); err != nil {
+    data, err := surge.ToBinary(alice)
+    if err != nil {
         panic(err)
     }
 
-    aliceAgain := Person{}
-    if err := surge.Unmarshal(buf, &aliceAgain); err != nil {
+    alice2 := Person{}
+    if err := surge.FromBinary(&alice2, data); err != nil {
         panic(err)
     }
 
-    if !reflect.DeepEqual(alice, aliceAgain) {
-        panic("bad marshal or unmarshal")
+    if !reflect.DeepEqual(alice, alice2) {
+        panic("bad (un)marshal")
     }
 }
 ```
+
+Built with ❤ by Ren. 
