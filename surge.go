@@ -231,7 +231,7 @@ func Marshal(v interface{}, w io.Writer) error {
 			if tagString == "" {
 				continue
 			}
-			tagInt := tagStringToTagInt(tagString)
+			tagInt := FastStrconvUint8(tagString)
 			if tagInt == 255 {
 				return newErrTagOutOfRange(tagInt)
 			}
@@ -344,7 +344,22 @@ func Unmarshal(v interface{}, r io.Reader) error {
 	valOf := reflect.ValueOf(v)
 	if valOf.Type().Kind() == reflect.Ptr {
 		switch valOf := reflect.Indirect(valOf); valOf.Type().Kind() {
-		case reflect.Array, reflect.Slice:
+		case reflect.Array:
+			len := uint32(0)
+			if err := Unmarshal(&len, r); err != nil {
+				return err
+			}
+			if uint32(valOf.Len()) != len {
+				return newErrBadLength(uint32(valOf.Len()), len)
+			}
+			for i := 0; i < int(len); i++ {
+				if err := Unmarshal(valOf.Index(i).Addr().Interface(), r); err != nil {
+					return err
+				}
+			}
+			return nil
+
+		case reflect.Slice:
 			len := uint32(0)
 			if err := Unmarshal(&len, r); err != nil {
 				return err
@@ -384,7 +399,7 @@ func Unmarshal(v interface{}, r io.Reader) error {
 				if tagString == "" {
 					continue
 				}
-				tagInt := tagStringToTagInt(tagString)
+				tagInt := FastStrconvUint8(tagString)
 				if tagInt == 255 {
 					return newErrTagOutOfRange(tagInt)
 				}
@@ -523,7 +538,7 @@ func SizeHint(v interface{}) int {
 			if tagString == "" {
 				continue
 			}
-			tagInt := tagStringToTagInt(tagString)
+			tagInt := FastStrconvUint8(tagString)
 			if tagInt == 255 {
 				// Ignore size hinting for malformed tags.
 				continue
@@ -542,10 +557,10 @@ func SizeHint(v interface{}) int {
 	return 0
 }
 
-// tagStringToTagInt uses a large switch statement to speed up the conversion of
+// FastStrconvUint8 uses a large switch statement to speed up the conversion of
 // strings to uint8s for the specific use-case of tags. A return value of 255
 // should be interpreted as an error.
-func tagStringToTagInt(tag string) uint8 {
+func FastStrconvUint8(tag string) uint8 {
 	switch tag {
 	case "0":
 		return 0
