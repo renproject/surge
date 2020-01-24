@@ -6,7 +6,7 @@ A library for fast binary (un)marshaling. Designed to be used in Byzantine netwo
 - [x] arrays,
 - [x] slices,
 - [x] maps,
-- [x] custom structs (using the ``surge:`` tag), and
+- [x] custom structs (using the `surge:` tag), and
 - [x] custom implementations (using the `Marshaler` and `Unmarshaler` interfaces).
 
 Example:

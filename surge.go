@@ -39,13 +39,13 @@ type SizeHinter interface {
 //
 // An example of marshaling a custom struct:
 //
-//		type Point struct {
-//			X uint64 `surge:"0"`
-//			Y uint64 `surge:"1"`
-//		}
+//      type Point struct {
+//          X uint64 `surge:"0"`
+//          Y uint64 `surge:"1"`
+//      }
 //
-//		p := Point{ 13, 169 }
-//		data, err := surge.ToBinary(p)
+//      p := Point{ 13, 169 }
+//      data, err := surge.ToBinary(p)
 //      if err != nil {
 //          panic(err)
 //      }
@@ -64,20 +64,20 @@ func ToBinary(v interface{}) ([]byte, error) {
 // An example of marshaling/unmarshaling a map:
 //
 //      xs := map[string]string{}
-//		xs["foo1"] = "bar"
-//		xs["foo2"] = "baz"
+//      xs["foo1"] = "bar"
+//      xs["foo2"] = "baz"
 //
-//		data, err := surge.ToBinary(xs)
-//		if err != nil {
-//			panic(err)
+//      data, err := surge.ToBinary(xs)
+//      if err != nil {
+//          panic(err)
 //		}
 //
 //      ys := map[string]string{}
 //      if err := surge.FromBinary(&ys, data); err != nil {
 //          panic(err)
 //      }
-//		fmt.Printf("foo1: %s\n", ys["foo1"])
-//		fmt.Printf("foo2: %s\n", ys["foo2"])
+//      fmt.Printf("foo1: %s\n", ys["foo1"])
+//      fmt.Printf("foo2: %s\n", ys["foo2"])
 //
 func FromBinary(v interface{}, data []byte) error {
 	buf := bytes.NewBuffer(data)
@@ -92,17 +92,17 @@ func FromBinary(v interface{}, data []byte) error {
 // parent value. In most use cases, the `ToBinary` function should be used.
 //
 // - When marshaling scalars, all values are marshaled into bytes using little
-//   endian encoding.
+// endian encoding.
 // - When marshaling arrays/slices/maps, an uint32 length prefix is marshaled
-//   and prefixed.
+// and prefixed.
 // - When marshaling maps, key/value pairs are marshaled in order of the keys
-//   (sorted after the key has been marshaled). This guarantees consistency; the
-//   marshaled bytes are always the same if the key/values in the map are the
-//   same. This is particularly useful when hashing.
-// - When marshaling custom struct, the ``surge:`` struct tags are used to
-//   convert the struct into a map (which is then marshaled like a normal map).
+// (sorted after the key has been marshaled). This guarantees consistency; the
+// marshaled bytes are always the same if the key/values in the map are the
+// same. This is particularly useful when hashing.
+// - When marshaling custom struct, the `surge:` struct tags are used to
+// convert the struct into a map (which is then marshaled like a normal map).
 // - When marshaling a value that implements the `Marshaler` interface, it is up
-//   to the user to guarantee that the implementation is sane.
+// to the user to guarantee that the implementation is sane.
 func Marshal(v interface{}, w io.Writer) error {
 	// Marshal scalar types.
 	switch v := v.(type) {
