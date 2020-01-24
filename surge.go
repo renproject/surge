@@ -23,10 +23,10 @@ type SizeHinter interface {
 }
 
 // ToBinary marshals a value into a byte slice. It allocates an in-memory
-// buffer, using `SizeHint` to estimate the initial size of the buffer
-// (preventing the need to grow the buffer during marshaling). This function
-// should not be used to implement the `Marshaler` interface, or as part of
-// marshaling a parent value.
+// buffer, using SizeHint to estimate the initial size of the buffer (preventing
+// the need to grow the buffer during marshaling). This function should not be
+// used to implement the Marshaler interface, or as part of marshaling a parent
+// value.
 //
 // An example of marshaling a scalar value:
 //
@@ -70,7 +70,7 @@ func ToBinary(v interface{}) ([]byte, error) {
 //      data, err := surge.ToBinary(xs)
 //      if err != nil {
 //          panic(err)
-//		}
+//      }
 //
 //      ys := map[string]string{}
 //      if err := surge.FromBinary(&ys, data); err != nil {
@@ -84,25 +84,29 @@ func FromBinary(v interface{}, data []byte) error {
 	return Unmarshal(v, buf)
 }
 
-// Marshal a value into an `io.Writer`. This is more efficient than marshaling a
-// value into a byte slice and returning the byte slice, because the `io.Writer`
+// Marshal a value into an io.Writer. This is more efficient than marshaling a
+// value into a byte slice and returning the byte slice, because the io.Writer
 // can be pre-allocated with enough memory to avoid internal allocations and
 // buffer copies. This function should only used when defining custom
-// implementations of the `Marshaler` interface, or as part of marshaling a
-// parent value. In most use cases, the `ToBinary` function should be used.
+// implementations of the Marshaler interface, or as part of marshaling a parent
+// value. In most use cases, the ToBinary function should be used.
 //
-// - When marshaling scalars, all values are marshaled into bytes using little
+// When marshaling scalars, all values are marshaled into bytes using little
 // endian encoding.
-// - When marshaling arrays/slices/maps, an uint32 length prefix is marshaled
-// and prefixed.
-// - When marshaling maps, key/value pairs are marshaled in order of the keys
+//
+// When marshaling arrays/slices/maps, an uint32 length prefix is marshaled and
+// prefixed.
+//
+// When marshaling maps, key/value pairs are marshaled in order of the keys
 // (sorted after the key has been marshaled). This guarantees consistency; the
 // marshaled bytes are always the same if the key/values in the map are the
 // same. This is particularly useful when hashing.
-// - When marshaling custom struct, the `surge:` struct tags are used to
-// convert the struct into a map (which is then marshaled like a normal map).
-// - When marshaling a value that implements the `Marshaler` interface, it is up
-// to the user to guarantee that the implementation is sane.
+//
+// When marshaling custom struct, struct tags are used to convert the struct
+// into a map (which is then marshaled like a normal map).
+//
+// When marshaling a value that implements the Marshaler interface, it is up to
+// the user to guarantee that the implementation is sane.
 func Marshal(v interface{}, w io.Writer) error {
 	// Marshal scalar types.
 	switch v := v.(type) {
@@ -246,10 +250,10 @@ func Marshal(v interface{}, w io.Writer) error {
 	return newErrUnsupportedMarshalType(v)
 }
 
-// Unmarshal from an `io.Reader` into a destination value. The destination value
+// Unmarshal from an io.Reader into a destination value. The destination value
 // must be a pointer. This function should only used when defining custom
-// implementations of the `Unmarshaler` interface, or as part of marshaling a
-// parent value. In most use cases, the `FromBinary` function should be used.
+// implementations of the Unmarshaler interface, or as part of marshaling a
+// parent value. In most use cases, the FromBinary function should be used.
 func Unmarshal(v interface{}, r io.Reader) error {
 	switch v := v.(type) {
 	case *bool:
