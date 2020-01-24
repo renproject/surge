@@ -22,6 +22,16 @@ func newErrUnsupportedUnmarshalType(v interface{}) error {
 	return ErrUnsupportedUnmarshalType{error: fmt.Errorf("unmarshal error: unsupported type %T", v)}
 }
 
+// ErrBadLength is returned when unmarshaling into an array with the wrong
+// length.
+type ErrBadLength struct {
+	error
+}
+
+func newErrBadLength(expected, got uint32) error {
+	return ErrBadLength{error: fmt.Errorf("unmarshal error: expected len=%v, got len=%v", expected, got)}
+}
+
 // ErrTagNotFound is returned when unmarshaling encounters a struct tag that is
 // not supported by the destination struct.
 type ErrTagNotFound struct {
