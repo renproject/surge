@@ -110,6 +110,14 @@ func FromBinary(v interface{}, data []byte) error {
 func Marshal(v interface{}, w io.Writer) error {
 	// Marshal scalar types.
 	switch v := v.(type) {
+	case []byte:
+		len := len(v)
+		if err := Marshal(uint32(len), w); err != nil {
+			return err
+		}
+		_, err := w.Write(v)
+		return err
+
 	case bool:
 		bs := [1]byte{0}
 		if v {
@@ -256,6 +264,17 @@ func Marshal(v interface{}, w io.Writer) error {
 // parent value. In most use cases, the FromBinary function should be used.
 func Unmarshal(v interface{}, r io.Reader) error {
 	switch v := v.(type) {
+	case *[]byte:
+		len := uint32(0)
+		if err := Unmarshal(&len, r); err != nil {
+			return err
+		}
+		*v = make([]byte, len)
+		if _, err := io.ReadFull(r, *v); err != nil {
+			return err
+		}
+		return nil
+
 	case *bool:
 		bs := [1]byte{}
 		if _, err := io.ReadFull(r, bs[:]); err != nil {
