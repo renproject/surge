@@ -133,19 +133,19 @@ func Marshal(v interface{}, w io.Writer) error {
 
 	case int16:
 		bs := [2]byte{}
-		binary.LittleEndian.PutUint16(bs[:], uint16(v))
+		binary.BigEndian.PutUint16(bs[:], uint16(v))
 		_, err := w.Write(bs[:])
 		return err
 
 	case int32:
 		bs := [4]byte{}
-		binary.LittleEndian.PutUint32(bs[:], uint32(v))
+		binary.BigEndian.PutUint32(bs[:], uint32(v))
 		_, err := w.Write(bs[:])
 		return err
 
 	case int64:
 		bs := [8]byte{}
-		binary.LittleEndian.PutUint64(bs[:], uint64(v))
+		binary.BigEndian.PutUint64(bs[:], uint64(v))
 		_, err := w.Write(bs[:])
 		return err
 
@@ -156,25 +156,25 @@ func Marshal(v interface{}, w io.Writer) error {
 
 	case uint16:
 		bs := [2]byte{}
-		binary.LittleEndian.PutUint16(bs[:], v)
+		binary.BigEndian.PutUint16(bs[:], v)
 		_, err := w.Write(bs[:])
 		return err
 
 	case uint32:
 		bs := [4]byte{}
-		binary.LittleEndian.PutUint32(bs[:], v)
+		binary.BigEndian.PutUint32(bs[:], v)
 		_, err := w.Write(bs[:])
 		return err
 
 	case uint64:
 		bs := [8]byte{}
-		binary.LittleEndian.PutUint64(bs[:], v)
+		binary.BigEndian.PutUint64(bs[:], v)
 		_, err := w.Write(bs[:])
 		return err
 
 	case string:
 		bs := [4]byte{}
-		binary.LittleEndian.PutUint32(bs[:], uint32(len(v)))
+		binary.BigEndian.PutUint32(bs[:], uint32(len(v)))
 		if _, err := w.Write(bs[:]); err != nil {
 			return err
 		}
@@ -296,7 +296,7 @@ func Unmarshal(v interface{}, r io.Reader) error {
 		if _, err := io.ReadFull(r, bs[:]); err != nil {
 			return err
 		}
-		*v = int16(binary.LittleEndian.Uint16(bs[:]))
+		*v = int16(binary.BigEndian.Uint16(bs[:]))
 		return nil
 
 	case *int32:
@@ -304,7 +304,7 @@ func Unmarshal(v interface{}, r io.Reader) error {
 		if _, err := io.ReadFull(r, bs[:]); err != nil {
 			return err
 		}
-		*v = int32(binary.LittleEndian.Uint32(bs[:]))
+		*v = int32(binary.BigEndian.Uint32(bs[:]))
 		return nil
 
 	case *int64:
@@ -312,7 +312,7 @@ func Unmarshal(v interface{}, r io.Reader) error {
 		if _, err := io.ReadFull(r, bs[:]); err != nil {
 			return err
 		}
-		*v = int64(binary.LittleEndian.Uint64(bs[:]))
+		*v = int64(binary.BigEndian.Uint64(bs[:]))
 		return nil
 
 	case *uint8:
@@ -328,7 +328,7 @@ func Unmarshal(v interface{}, r io.Reader) error {
 		if _, err := io.ReadFull(r, bs[:]); err != nil {
 			return err
 		}
-		*v = binary.LittleEndian.Uint16(bs[:])
+		*v = binary.BigEndian.Uint16(bs[:])
 		return nil
 
 	case *uint32:
@@ -336,7 +336,7 @@ func Unmarshal(v interface{}, r io.Reader) error {
 		if _, err := io.ReadFull(r, bs[:]); err != nil {
 			return err
 		}
-		*v = binary.LittleEndian.Uint32(bs[:])
+		*v = binary.BigEndian.Uint32(bs[:])
 		return nil
 
 	case *uint64:
@@ -344,7 +344,7 @@ func Unmarshal(v interface{}, r io.Reader) error {
 		if _, err := io.ReadFull(r, bs[:]); err != nil {
 			return err
 		}
-		*v = binary.LittleEndian.Uint64(bs[:])
+		*v = binary.BigEndian.Uint64(bs[:])
 		return nil
 
 	case *string:
@@ -352,7 +352,7 @@ func Unmarshal(v interface{}, r io.Reader) error {
 		if _, err := io.ReadFull(r, bs[:]); err != nil {
 			return err
 		}
-		data := make([]byte, binary.LittleEndian.Uint32(bs[:]))
+		data := make([]byte, binary.BigEndian.Uint32(bs[:]))
 		if _, err := io.ReadFull(r, data); err != nil {
 			return err
 		}
