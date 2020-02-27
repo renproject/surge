@@ -1,7 +1,6 @@
 package surge_test
 
 import (
-	"fmt"
 	"math/rand"
 	"reflect"
 	"testing/quick"
@@ -275,87 +274,6 @@ var _ = Describe("Surge", func() {
 				err := quick.Check(f, nil)
 				Expect(err).ToNot(HaveOccurred())
 			})
-		})
-	})
-
-	Context("when marshaling structs", func() {
-		Context("when marshaling and then unmarshaling", func() {
-			It("should equal itself", func() {
-				type Person struct {
-					Name       string   `surge:"0"`
-					Age        uint64   `surge:"1"`
-					Friends    []string `surge:"2"`
-					PubIgnore  bool
-					privIgnore bool
-				}
-				x := Person{
-					Name:       "Alice",
-					Age:        25,
-					Friends:    []string{"Bob", "Eve"},
-					PubIgnore:  true,
-					privIgnore: true,
-				}
-
-				data, err := ToBinary(x)
-				Expect(err).ToNot(HaveOccurred())
-
-				y := Person{}
-				Expect(FromBinary(&y, data)).ToNot(HaveOccurred())
-				Expect(y.PubIgnore).To(BeFalse())
-				Expect(y.privIgnore).To(BeFalse())
-				y.PubIgnore = true
-				y.privIgnore = true
-
-				Expect(x).To(Equal(y))
-			})
-
-			Context("when structs are recursive", func() {
-				It("should equal itself", func() {
-					type Person struct {
-						Name    string   `surge:"0"`
-						Age     uint64   `surge:"1"`
-						Friends []Person `surge:"2"`
-					}
-
-					x := Person{
-						Name: "Alice",
-						Age:  25,
-						Friends: []Person{
-							Person{
-								Name:    "Bob",
-								Age:     26,
-								Friends: []Person{},
-							},
-						},
-					}
-
-					data, err := ToBinary(x)
-					Expect(err).ToNot(HaveOccurred())
-
-					y := Person{}
-					Expect(FromBinary(&y, data)).ToNot(HaveOccurred())
-
-					Expect(x).To(Equal(y))
-				})
-			})
-		})
-	})
-
-	Context("when converting strings to uint8s", func() {
-		It("should return an uint8 for strings in the range [0 .. 255)", func() {
-			for i := 0; i < 255; i++ {
-				str := fmt.Sprintf("%d", i)
-				u8 := FastStrconvUint8(str)
-				Expect(u8).To(Equal(uint8(i)))
-			}
-		})
-
-		It("should return 255 for strings outside the range [0 .. 255)", func() {
-			for i := 255; i < 1024; i++ {
-				str := fmt.Sprintf("%d", i)
-				u8 := FastStrconvUint8(str)
-				Expect(u8).To(Equal(uint8(255)))
-			}
 		})
 	})
 })

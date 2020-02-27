@@ -1,6 +1,13 @@
 package surge
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
+
+// ErrMaxBytesExceeded is returned when too many bytes need to be allocated in
+// memory.
+var ErrMaxBytesExceeded = errors.New("max bytes exceeded")
 
 // ErrUnsupportedMarshalType is returned when the an unsupported type is
 // encountered during marshaling.
