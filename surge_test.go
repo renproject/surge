@@ -1,6 +1,8 @@
 package surge_test
 
 import (
+	"bytes"
+	"io"
 	"math/rand"
 	"reflect"
 	"testing/quick"
@@ -10,7 +12,33 @@ import (
 	. "github.com/renproject/surge"
 )
 
+type Point struct {
+	x uint64
+	y uint64
+}
+
+func (p Point) SizeHint() int {
+	return SizeHint(p.x) + SizeHint(p.y)
+}
+
+func (p Point) Marshal(w io.Writer, m int) (int, error) {
+	m, err := Marshal(w, p.x, m)
+	if err != nil {
+		return m, err
+	}
+	return Marshal(w, p.y, m)
+}
+
+func (p *Point) Unmarshal(r io.Reader, m int) (int, error) {
+	m, err := Unmarshal(r, &p.x, m)
+	if err != nil {
+		return m, err
+	}
+	return Unmarshal(r, &p.y, m)
+}
+
 var _ = Describe("Surge", func() {
+
 	Context("when marshaling bool", func() {
 		Context("when marshaling and then unmarshaling", func() {
 			It("should equal itself", func() {
@@ -18,7 +46,7 @@ var _ = Describe("Surge", func() {
 					y := bool(false)
 					bin, err := ToBinary(x)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(FromBinary(&y, bin)).ToNot(HaveOccurred())
+					Expect(FromBinary(bin, &y)).ToNot(HaveOccurred())
 					return reflect.DeepEqual(x, y)
 				}
 				err := quick.Check(f, nil)
@@ -34,7 +62,7 @@ var _ = Describe("Surge", func() {
 					y := int8(0)
 					bin, err := ToBinary(x)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(FromBinary(&y, bin)).ToNot(HaveOccurred())
+					Expect(FromBinary(bin, &y)).ToNot(HaveOccurred())
 					return reflect.DeepEqual(x, y)
 				}
 				err := quick.Check(f, nil)
@@ -50,7 +78,7 @@ var _ = Describe("Surge", func() {
 					y := int16(0)
 					bin, err := ToBinary(x)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(FromBinary(&y, bin)).ToNot(HaveOccurred())
+					Expect(FromBinary(bin, &y)).ToNot(HaveOccurred())
 					return reflect.DeepEqual(x, y)
 				}
 				err := quick.Check(f, nil)
@@ -66,7 +94,7 @@ var _ = Describe("Surge", func() {
 					y := int32(0)
 					bin, err := ToBinary(x)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(FromBinary(&y, bin)).ToNot(HaveOccurred())
+					Expect(FromBinary(bin, &y)).ToNot(HaveOccurred())
 					return reflect.DeepEqual(x, y)
 				}
 				err := quick.Check(f, nil)
@@ -82,7 +110,7 @@ var _ = Describe("Surge", func() {
 					y := int64(0)
 					bin, err := ToBinary(x)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(FromBinary(&y, bin)).ToNot(HaveOccurred())
+					Expect(FromBinary(bin, &y)).ToNot(HaveOccurred())
 					return reflect.DeepEqual(x, y)
 				}
 				err := quick.Check(f, nil)
@@ -98,7 +126,7 @@ var _ = Describe("Surge", func() {
 					y := uint8(0)
 					bin, err := ToBinary(x)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(FromBinary(&y, bin)).ToNot(HaveOccurred())
+					Expect(FromBinary(bin, &y)).ToNot(HaveOccurred())
 					return reflect.DeepEqual(x, y)
 				}
 				err := quick.Check(f, nil)
@@ -114,7 +142,7 @@ var _ = Describe("Surge", func() {
 					y := uint16(0)
 					bin, err := ToBinary(x)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(FromBinary(&y, bin)).ToNot(HaveOccurred())
+					Expect(FromBinary(bin, &y)).ToNot(HaveOccurred())
 					return reflect.DeepEqual(x, y)
 				}
 				err := quick.Check(f, nil)
@@ -130,7 +158,7 @@ var _ = Describe("Surge", func() {
 					y := uint32(0)
 					bin, err := ToBinary(x)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(FromBinary(&y, bin)).ToNot(HaveOccurred())
+					Expect(FromBinary(bin, &y)).ToNot(HaveOccurred())
 					return reflect.DeepEqual(x, y)
 				}
 				err := quick.Check(f, nil)
@@ -146,7 +174,7 @@ var _ = Describe("Surge", func() {
 					y := uint64(0)
 					bin, err := ToBinary(x)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(FromBinary(&y, bin)).ToNot(HaveOccurred())
+					Expect(FromBinary(bin, &y)).ToNot(HaveOccurred())
 					return reflect.DeepEqual(x, y)
 				}
 				err := quick.Check(f, nil)
@@ -155,34 +183,18 @@ var _ = Describe("Surge", func() {
 		})
 	})
 
-	Context("when marshaling *int8", func() {
-		Context("when marshaling and then unmarshaling", func() {
-			It("should equal itself", func() {
-				f := func(x int8) bool {
-					y := int8(0)
-					bin, err := ToBinary(&x)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(FromBinary(&y, bin)).ToNot(HaveOccurred())
-					return reflect.DeepEqual(x, y)
-				}
-				err := quick.Check(f, nil)
-				Expect(err).ToNot(HaveOccurred())
-			})
-		})
-	})
-
-	Context("when marshaling []int8", func() {
+	Context("when marshaling []byte", func() {
 		Context("when marshaling and then unmarshaling", func() {
 			It("should equal itself", func() {
 				f := func(n uint16) bool {
-					xs := make([]int8, n)
+					xs := make([]byte, n)
 					for i := uint16(0); i < n; i++ {
-						xs[i] = int8(rand.Int63())
+						xs[i] = byte(rand.Int63())
 					}
-					ys := make([]int8, 0)
+					ys := make([]byte, 0)
 					bin, err := ToBinary(xs)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(FromBinary(&ys, bin)).ToNot(HaveOccurred())
+					Expect(FromBinary(bin, &ys)).ToNot(HaveOccurred())
 					return reflect.DeepEqual(xs, ys)
 				}
 				err := quick.Check(f, nil)
@@ -191,18 +203,19 @@ var _ = Describe("Surge", func() {
 		})
 	})
 
-	Context("when marshaling *[]int8", func() {
+	Context("when marshaling string", func() {
 		Context("when marshaling and then unmarshaling", func() {
 			It("should equal itself", func() {
 				f := func(n uint16) bool {
-					xs := make([]int8, n)
+					data := make([]byte, n)
 					for i := uint16(0); i < n; i++ {
-						xs[i] = int8(rand.Int63())
+						data[i] = byte(rand.Int63())
 					}
-					ys := make([]int8, 0)
-					bin, err := ToBinary(&xs)
+					xs := string(data)
+					ys := string("")
+					bin, err := ToBinary(xs)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(FromBinary(&ys, bin)).ToNot(HaveOccurred())
+					Expect(FromBinary(bin, &ys)).ToNot(HaveOccurred())
 					return reflect.DeepEqual(xs, ys)
 				}
 				err := quick.Check(f, nil)
@@ -211,69 +224,203 @@ var _ = Describe("Surge", func() {
 		})
 	})
 
-	Context("when marshaling []int8 array", func() {
+	Context("when marshaling *uint64", func() {
 		Context("when marshaling and then unmarshaling", func() {
 			It("should equal itself", func() {
-				emptyxs := []int8{}
-				emptyys := []int8{}
+				f := func(x uint64) bool {
+					y := uint64(0)
+					bin, err := ToBinary(&x)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(FromBinary(bin, &y)).ToNot(HaveOccurred())
+					return reflect.DeepEqual(x, y)
+				}
+				err := quick.Check(f, nil)
+				Expect(err).ToNot(HaveOccurred())
+			})
+		})
+	})
+
+	Context("when marshaling []uint64", func() {
+		Context("when marshaling and then unmarshaling", func() {
+			It("should equal itself", func() {
+				f := func(n uint16) bool {
+					xs := make([]uint64, n)
+					for i := uint16(0); i < n; i++ {
+						xs[i] = rand.Uint64()
+					}
+					ys := make([]uint64, 0)
+					bin, err := ToBinary(xs)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(FromBinary(bin, &ys)).ToNot(HaveOccurred())
+					return reflect.DeepEqual(xs, ys)
+				}
+				err := quick.Check(f, nil)
+				Expect(err).ToNot(HaveOccurred())
+			})
+		})
+	})
+
+	Context("when marshaling []uint64 array", func() {
+		Context("when marshaling and then unmarshaling", func() {
+			It("should equal itself", func() {
+				emptyxs := []uint64{}
+				emptyys := []uint64{}
 				bin, err := ToBinary(emptyxs)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(FromBinary(&emptyys, bin)).ToNot(HaveOccurred())
+				Expect(FromBinary(bin, &emptyys)).ToNot(HaveOccurred())
 				Expect(emptyxs).To(Equal(emptyys))
 
-				xs := [1000]int8{}
+				xs := [1000]uint64{}
 				for i := 0; i < 1000; i++ {
-					xs[i] = int8(rand.Int63())
+					xs[i] = rand.Uint64()
 				}
-				ys := [1000]int8{}
+				ys := [1000]uint64{}
 				bin, err = ToBinary(xs)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(FromBinary(&ys, bin)).ToNot(HaveOccurred())
+				Expect(FromBinary(bin, &ys)).ToNot(HaveOccurred())
 				Expect(xs).To(Equal(ys))
 			})
 		})
 	})
 
-	Context("when marshaling *[]int8 array", func() {
+	Context("when marshaling map[uint64]uint64", func() {
 		Context("when marshaling and then unmarshaling", func() {
 			It("should equal itself", func() {
-				emptyxs := []int8{}
-				emptyys := []int8{}
-				bin, err := ToBinary(&emptyxs)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(FromBinary(&emptyys, bin)).ToNot(HaveOccurred())
-				Expect(emptyxs).To(Equal(emptyys))
-
-				xs := [1000]int8{}
-				for i := 0; i < 1000; i++ {
-					xs[i] = int8(rand.Int63())
-				}
-				ys := [1000]int8{}
-				bin, err = ToBinary(&xs)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(FromBinary(&ys, bin)).ToNot(HaveOccurred())
-				Expect(xs).To(Equal(ys))
-			})
-		})
-	})
-
-	Context("when marshaling map[int8]int8", func() {
-		Context("when marshaling and then unmarshaling", func() {
-			It("should equal itself", func() {
-				f := func(n uint8) bool {
-					xs := make(map[int8]int8)
-					for i := uint8(0); i < n; i++ {
-						xs[int8(rand.Int63())] = int8(rand.Int63())
+				f := func(n uint16) bool {
+					xs := make(map[uint64]uint64)
+					for i := uint16(0); i < n; i++ {
+						xs[rand.Uint64()] = rand.Uint64()
 					}
-					ys := make(map[int8]int8)
+					ys := make(map[uint64]uint64)
 					bin, err := ToBinary(&xs)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(FromBinary(&ys, bin)).ToNot(HaveOccurred())
+					Expect(FromBinary(bin, &ys)).ToNot(HaveOccurred())
 					return reflect.DeepEqual(xs, ys)
 				}
 				err := quick.Check(f, nil)
 				Expect(err).ToNot(HaveOccurred())
 			})
+		})
+	})
+
+	Context("when marshaling a custom struct", func() {
+		Context("when marshaling and then unmarshaling", func() {
+			It("should equal itself", func() {
+				f := func(x, y uint64) bool {
+					a := Point{x, y}
+					b := Point{}
+					bin, err := ToBinary(a)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(FromBinary(bin, &b)).ToNot(HaveOccurred())
+					return reflect.DeepEqual(a, b)
+				}
+				err := quick.Check(f, nil)
+				Expect(err).ToNot(HaveOccurred())
+			})
+		})
+	})
+
+	Context("when marshaling with positive capacity", func() {
+		Context("when marshaling too many bytes", func() {
+			Context("when marshaling []byte", func() {
+				It("should return a negative capacity", func() {
+					f := func(n uint16) bool {
+						xs := make([]byte, n+2)
+						for i := 0; i < int(n)+2; i++ {
+							xs[i] = byte(rand.Int63())
+						}
+						m, err := Marshal(new(bytes.Buffer), xs, 1)
+						Expect(m).To(BeNumerically("<", 0))
+						Expect(err).ToNot(HaveOccurred())
+						m, err = Marshal(new(bytes.Buffer), xs, int(n)+1)
+						Expect(m).To(BeNumerically("<", 0))
+						Expect(err).ToNot(HaveOccurred())
+						return true
+					}
+					err := quick.Check(f, nil)
+					Expect(err).ToNot(HaveOccurred())
+				})
+			})
+
+			Context("when marshaling string", func() {
+				It("should return a negative capacity", func() {
+					f := func(n uint16) bool {
+						data := make([]byte, int(n)+2)
+						for i := 0; i < int(n)+2; i++ {
+							data[i] = byte(rand.Int63())
+						}
+						xs := string(data)
+						m, err := Marshal(new(bytes.Buffer), xs, 1)
+						Expect(m).To(BeNumerically("<", 0))
+						Expect(err).ToNot(HaveOccurred())
+						m, err = Marshal(new(bytes.Buffer), xs, int(n)+1)
+						Expect(m).To(BeNumerically("<", 0))
+						Expect(err).ToNot(HaveOccurred())
+						return true
+					}
+					err := quick.Check(f, nil)
+					Expect(err).ToNot(HaveOccurred())
+				})
+			})
+
+			Context("when marshaling a custom struct", func() {
+				It("should return an error", func() {
+					f := func(x, y uint64) bool {
+						a := Point{x, y}
+						_, err := Marshal(new(bytes.Buffer), a, 1)
+						Expect(err).To(HaveOccurred())
+						_, err = Marshal(new(bytes.Buffer), a, 7)
+						Expect(err).To(HaveOccurred())
+						return true
+					}
+					err := quick.Check(f, nil)
+					Expect(err).ToNot(HaveOccurred())
+				})
+			})
+		})
+	})
+
+	Context("when marshaling with negative capacity", func() {
+		It("should return an error", func() {
+			m, err := Marshal(nil, nil, 0)
+			Expect(m).To(Equal(0))
+			Expect(err).To(HaveOccurred())
+			m, err = Marshal(nil, nil, -1)
+			Expect(m).To(Equal(-1))
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Context("when marshaling an unsupported type", func() {
+		It("should return an error", func() {
+			_, err := ToBinary(struct{}{})
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Context("when unmarshaling with negative capacity", func() {
+		It("should return an error", func() {
+			m, err := Unmarshal(nil, nil, 0)
+			Expect(m).To(Equal(0))
+			Expect(err).To(HaveOccurred())
+			m, err = Unmarshal(nil, nil, -1)
+			Expect(m).To(Equal(-1))
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Context("when marshaling an unsupported type", func() {
+		It("should return an error", func() {
+			err := FromBinary([]byte{}, &struct{}{})
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Context("when unmarshaling to a non-pointer type", func() {
+		It("should return an error", func() {
+			y := uint64(0)
+			err := FromBinary([]byte{14, 26, 37, 48}, y)
+			Expect(err).To(HaveOccurred())
 		})
 	})
 })
