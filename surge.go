@@ -11,6 +11,14 @@ import (
 // MaxBytes is set to 8 MB by default.
 const MaxBytes = int(8 * 1024 * 1024)
 
+// Surger defines a union of the marshaler, unmarshaler, and size hinter
+// interfaces.
+type Surger interface {
+	SizeHint() int
+	Marshal(io.Writer, int) (int, error)
+	Unmarshal(io.Reader, int) (int, error)
+}
+
 // SizeHinter defines an interface for types that can hint at the number of
 // bytes required to represent the type in its binary form. This is useful for
 // grouping memory allocations during marshaling/unmarshaling.
