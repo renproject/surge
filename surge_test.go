@@ -303,7 +303,7 @@ var _ = Describe("Surge", func() {
 		})
 	})
 
-	Context("when marshaling a custom struct", func() {
+	Context("when marshaling a struct", func() {
 		Context("when marshaling and then unmarshaling", func() {
 			It("should equal itself", func() {
 				f := func(x, y uint64) bool {
@@ -363,7 +363,7 @@ var _ = Describe("Surge", func() {
 				})
 			})
 
-			Context("when marshaling a custom struct", func() {
+			Context("when marshaling a struct", func() {
 				It("should return an error", func() {
 					f := func(x, y uint64) bool {
 						a := Point{x, y}
