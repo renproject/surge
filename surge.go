@@ -3,6 +3,7 @@ package surge
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"reflect"
 	"sort"
@@ -98,15 +99,13 @@ func ToBinary(v interface{}) ([]byte, error) {
 //  fmt.Printf("foo2: %s\n", ys["foo2"])
 //
 func FromBinary(data []byte, v interface{}) (err error) {
-	// TODO: Profile the performance impact of doing this. Generally, checking m
-	// will be faster, but it might be a good idea to have this recovery here
-	// just in case.
-	//
-	//  defer func() {
-	//      if r := recover(); r != nil {
-	//          err = fmt.Errorf("recovered: %v", r)
-	//      }
-	//  }()
+	// Benchmarks indicate no immediate regression, but benchmarking
+	// error cases would need to be done for deeper insights
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("recovered: %v", r)
+		}
+	}()
 
 	buf := bytes.NewBuffer(data)
 	_, err = Unmarshal(buf, v, MaxBytes)
