@@ -24,7 +24,8 @@ type Surger interface {
 // grouping memory allocations during marshaling/unmarshaling.
 type SizeHinter interface {
 	// SizeHint returns the recommended number of bytes that should be allocated
-	// when marshaling this type.
+	// when marshaling this type. It should return an upper bound of the
+	// estimated number of bytes, if the exact number is unknown.
 	SizeHint() int
 }
 
@@ -96,10 +97,20 @@ func ToBinary(v interface{}) ([]byte, error) {
 //  fmt.Printf("foo1: %s\n", ys["foo1"])
 //  fmt.Printf("foo2: %s\n", ys["foo2"])
 //
-func FromBinary(data []byte, v interface{}) error {
+func FromBinary(data []byte, v interface{}) (err error) {
+	// TODO: Profile the performance impact of doing this. Generally, checking m
+	// will be faster, but it might be a good idea to have this recovery here
+	// just in case.
+	//
+	//  defer func() {
+	//      if r := recover(); r != nil {
+	//          err = fmt.Errorf("recovered: %v", r)
+	//      }
+	//  }()
+
 	buf := bytes.NewBuffer(data)
-	_, err := Unmarshal(buf, v, MaxBytes)
-	return err
+	_, err = Unmarshal(buf, v, MaxBytes)
+	return
 }
 
 // SizeHint returns an estimate of the number of bytes that will be produced
@@ -567,7 +578,24 @@ func Unmarshal(r io.Reader, v interface{}, m int) (int, error) {
 		if int(len) < 0 {
 			return m, newErrNegativeLength(int(len))
 		}
-		m -= int(len)
+
+		// TODO: Scale length by the SizeHint of the element. This is because
+		// each element in a list is not going to be a single byte. A similar
+		// this needs to be done for maps.
+		//
+		//  size := SizeHint(reflect.New(valOf.Type()))
+		//  if size <= 16 {
+		//      size := 16 // All unknown types will take up approximately 16 bytes, assuming a 64-bit system.
+		//  }
+		//  if len * 8 < len {
+		//      return m, ErrLengthOverflow
+		//  }
+		//  if len * 8 < 0 {
+		//      return m, ErrLengthOverflow
+		//  }
+		//  m -= int(len * 8)
+
+		m -= int(len) // TODO: Check if int(len) < m before doing this, to protect against underflow.
 		if m <= 0 {
 			return m, ErrMaxBytesExceeded
 		}
@@ -593,6 +621,10 @@ func Unmarshal(r io.Reader, v interface{}, m int) (int, error) {
 		if int(len) < 0 {
 			return m, newErrNegativeLength(int(len))
 		}
+
+		// TODO: See the "TODO" for slices about scaling the length. This needs
+		// to be done for maps, accounting for both keys and values.
+
 		m -= int(len)
 		if m <= 0 {
 			return m, ErrMaxBytesExceeded
