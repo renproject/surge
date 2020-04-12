@@ -48,3 +48,12 @@ type ErrNegativeLength struct {
 func newErrNegativeLength(got int) error {
 	return ErrNegativeLength{error: fmt.Errorf("unmarshal error: len>=0, got len=%v", got)}
 }
+
+// ErrLengthOverflow is returned when the length is large enough to overflow int size
+type ErrLengthOverflow struct {
+	error
+}
+
+func newErrLengthOverflow() error {
+	return ErrBadLength{error: fmt.Errorf("integer overflow")}
+}

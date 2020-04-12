@@ -578,26 +578,16 @@ func Unmarshal(r io.Reader, v interface{}, m int) (int, error) {
 			return m, newErrNegativeLength(int(len))
 		}
 
-		// TODO: Scale length by the SizeHint of the element. This is because
+		// Scale length by the SizeHint of the element. This is because
 		// each element in a list is not going to be a single byte. A similar
 		// this needs to be done for maps.
-		//
-		//  size := SizeHint(reflect.New(valOf.Type()))
-		//  if size <= 16 {
-		//      size := 16 // All unknown types will take up approximately 16 bytes, assuming a 64-bit system.
-		//  }
-		//  if len * 8 < len {
-		//      return m, ErrLengthOverflow
-		//  }
-		//  if len * 8 < 0 {
-		//      return m, ErrLengthOverflow
-		//  }
-		//  m -= int(len * 8)
 
-		m -= int(len) // TODO: Check if int(len) < m before doing this, to protect against underflow.
-		if m <= 0 {
-			return m, ErrMaxBytesExceeded
+		size := SizeHint(reflect.New(valOf.Type()))
+		m, err = reduceBySize(m, len, size)
+		if err != nil {
+			return m, err
 		}
+
 		// Read slice
 		valOf.Set(reflect.MakeSlice(valOf.Type(), int(len), int(len)))
 		for i := 0; i < int(len); i++ {
@@ -620,18 +610,24 @@ func Unmarshal(r io.Reader, v interface{}, m int) (int, error) {
 		if int(len) < 0 {
 			return m, newErrNegativeLength(int(len))
 		}
-
-		// TODO: See the "TODO" for slices about scaling the length. This needs
-		// to be done for maps, accounting for both keys and values.
-
-		m -= int(len)
-		if m <= 0 {
-			return m, ErrMaxBytesExceeded
-		}
 		// Read map
 		valOf.Set(reflect.MakeMapWithSize(valOf.Type(), int(len)))
 		key := reflect.New(valOf.Type().Key())
+		keySize := SizeHint(key)
+
+		m, err = reduceBySize(m, len, keySize)
+		if err != nil {
+			return m, err
+		}
+
 		elem := reflect.New(valOf.Type().Elem())
+		elemSize := SizeHint(key)
+
+		m, err = reduceBySize(m, len, elemSize)
+		if err != nil {
+			return m, err
+		}
+
 		for i := 0; i < int(len); i++ {
 			// Read key
 			m, err = Unmarshal(r, key.Interface(), m)
@@ -650,4 +646,26 @@ func Unmarshal(r io.Reader, v interface{}, m int) (int, error) {
 	}
 
 	return m, newErrUnsupportedUnmarshalType(v)
+}
+
+func reduceBySize(m int, len uint32, size int) (int, error) {
+	if size <= 16 {
+		size = 16 // All unknown types will take up approximately 16 bytes, assuming a 64-bit system.
+	}
+	if int(len)*size < int(len) {
+		return m, newErrLengthOverflow()
+	}
+	if int(len)*size < 0 {
+		return m, newErrLengthOverflow()
+	}
+	if int(len)*size > m {
+		return m, newErrLengthOverflow()
+	}
+
+	m -= int(len) * size
+
+	if m <= 0 {
+		return m, ErrMaxBytesExceeded
+	}
+	return m, nil
 }
