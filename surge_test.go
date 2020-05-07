@@ -330,11 +330,11 @@ var _ = Describe("Surge", func() {
 							xs[i] = byte(rand.Int63())
 						}
 						m, err := Marshal(new(bytes.Buffer), xs, 1)
-						Expect(m).To(BeNumerically("<", 0))
-						Expect(err).ToNot(HaveOccurred())
+						Expect(m).To(Equal(1))
+						Expect(err).To(HaveOccurred())
 						m, err = Marshal(new(bytes.Buffer), xs, int(n)+1)
-						Expect(m).To(BeNumerically("<", 0))
-						Expect(err).ToNot(HaveOccurred())
+						Expect(m).To(Equal(int(n) + 1))
+						Expect(err).To(HaveOccurred())
 						return true
 					}
 					err := quick.Check(f, nil)
@@ -351,11 +351,11 @@ var _ = Describe("Surge", func() {
 						}
 						xs := string(data)
 						m, err := Marshal(new(bytes.Buffer), xs, 1)
-						Expect(m).To(BeNumerically("<", 0))
-						Expect(err).ToNot(HaveOccurred())
+						Expect(m).To(Equal(1))
+						Expect(err).To(HaveOccurred())
 						m, err = Marshal(new(bytes.Buffer), xs, int(n)+1)
-						Expect(m).To(BeNumerically("<", 0))
-						Expect(err).ToNot(HaveOccurred())
+						Expect(m).To(Equal(int(n) + 1))
+						Expect(err).To(HaveOccurred())
 						return true
 					}
 					err := quick.Check(f, nil)
