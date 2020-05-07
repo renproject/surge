@@ -177,11 +177,23 @@ func SizeHint(v interface{}) int {
 	}
 
 	valOf := reflect.ValueOf(v)
-	if valOf.Type().Kind() == reflect.Ptr {
-		return SizeHint(reflect.Indirect(valOf).Interface())
-	}
 
 	switch valOf.Type().Kind() {
+	case reflect.String:
+		return 4 + valOf.Len()
+
+	case reflect.Bool, reflect.Int8, reflect.Uint8:
+		return 1
+
+	case reflect.Int16, reflect.Uint16:
+		return 2
+
+	case reflect.Int32, reflect.Uint32:
+		return 4
+
+	case reflect.Int64, reflect.Uint64:
+		return 8
+
 	case reflect.Array, reflect.Slice:
 		sizeHint := 4 // Size of length prefix
 		for i := 0; i < valOf.Len(); i++ {
@@ -196,6 +208,10 @@ func SizeHint(v interface{}) int {
 			sizeHint += SizeHint(valOf.MapIndex(key).Interface())
 		}
 		return sizeHint
+	}
+
+	if valOf.Type().Kind() == reflect.Ptr {
+		return SizeHint(reflect.Indirect(valOf).Interface())
 	}
 
 	return 0
@@ -508,12 +524,12 @@ func Unmarshal(r io.Reader, v interface{}, m int) (int, error) {
 		}
 		v := v.(*bool)
 		bs := [1]byte{}
-		_, err := io.ReadFull(r, bs[:])
+		n, err := io.ReadFull(r, bs[:])
 		if err != nil {
-			return m, err
+			return m - n, err
 		}
 		*v = bs[0] != 0
-		return m, nil
+		return m - n, nil
 
 	case reflect.Int8:
 		if m < 1 {
@@ -521,12 +537,12 @@ func Unmarshal(r io.Reader, v interface{}, m int) (int, error) {
 		}
 		v := v.(*int8)
 		bs := [1]byte{}
-		_, err := io.ReadFull(r, bs[:])
+		n, err := io.ReadFull(r, bs[:])
 		if err != nil {
-			return m, err
+			return m - n, err
 		}
 		*v = int8(bs[0])
-		return m, nil
+		return m - n, nil
 
 	case reflect.Int16:
 		if m < 2 {
@@ -534,12 +550,12 @@ func Unmarshal(r io.Reader, v interface{}, m int) (int, error) {
 		}
 		v := v.(*int16)
 		bs := [2]byte{}
-		_, err := io.ReadFull(r, bs[:])
+		n, err := io.ReadFull(r, bs[:])
 		if err != nil {
-			return m, err
+			return m - n, err
 		}
 		*v = int16(binary.BigEndian.Uint16(bs[:]))
-		return m, nil
+		return m - n, nil
 
 	case reflect.Int32:
 		if m < 4 {
@@ -547,12 +563,12 @@ func Unmarshal(r io.Reader, v interface{}, m int) (int, error) {
 		}
 		v := v.(*int32)
 		bs := [4]byte{}
-		_, err := io.ReadFull(r, bs[:])
+		n, err := io.ReadFull(r, bs[:])
 		if err != nil {
-			return m, err
+			return m - n, err
 		}
 		*v = int32(binary.BigEndian.Uint32(bs[:]))
-		return m, nil
+		return m - n, nil
 
 	case reflect.Int64:
 		if m < 8 {
@@ -560,12 +576,12 @@ func Unmarshal(r io.Reader, v interface{}, m int) (int, error) {
 		}
 		v := v.(*int64)
 		bs := [8]byte{}
-		_, err := io.ReadFull(r, bs[:])
+		n, err := io.ReadFull(r, bs[:])
 		if err != nil {
-			return m, err
+			return m - n, err
 		}
 		*v = int64(binary.BigEndian.Uint64(bs[:]))
-		return m, nil
+		return m - n, nil
 
 	case reflect.Uint8:
 		if m < 1 {
@@ -573,12 +589,12 @@ func Unmarshal(r io.Reader, v interface{}, m int) (int, error) {
 		}
 		v := v.(*uint8)
 		bs := [1]byte{}
-		_, err := io.ReadFull(r, bs[:])
+		n, err := io.ReadFull(r, bs[:])
 		if err != nil {
-			return m, err
+			return m - n, err
 		}
 		*v = uint8(bs[0])
-		return m, nil
+		return m - n, nil
 
 	case reflect.Uint16:
 		if m < 2 {
@@ -586,12 +602,12 @@ func Unmarshal(r io.Reader, v interface{}, m int) (int, error) {
 		}
 		v := v.(*uint16)
 		bs := [2]byte{}
-		_, err := io.ReadFull(r, bs[:])
+		n, err := io.ReadFull(r, bs[:])
 		if err != nil {
-			return m, err
+			return m - n, err
 		}
 		*v = binary.BigEndian.Uint16(bs[:])
-		return m, nil
+		return m - n, nil
 
 	case reflect.Uint32:
 		if m < 4 {
@@ -599,12 +615,12 @@ func Unmarshal(r io.Reader, v interface{}, m int) (int, error) {
 		}
 		v := v.(*uint32)
 		bs := [4]byte{}
-		_, err := io.ReadFull(r, bs[:])
+		n, err := io.ReadFull(r, bs[:])
 		if err != nil {
-			return m, err
+			return m - n, err
 		}
 		*v = binary.BigEndian.Uint32(bs[:])
-		return m, nil
+		return m - n, nil
 
 	case reflect.Uint64:
 		if m < 8 {
@@ -612,12 +628,12 @@ func Unmarshal(r io.Reader, v interface{}, m int) (int, error) {
 		}
 		v := v.(*uint64)
 		bs := [8]byte{}
-		_, err := io.ReadFull(r, bs[:])
+		n, err := io.ReadFull(r, bs[:])
 		if err != nil {
-			return m, err
+			return m - n, err
 		}
 		*v = binary.BigEndian.Uint64(bs[:])
-		return m, nil
+		return m - n, nil
 
 	case reflect.Array:
 		// Read length of array
