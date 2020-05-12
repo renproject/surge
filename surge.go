@@ -687,12 +687,19 @@ func Unmarshal(r io.Reader, v interface{}, m int) (int, error) {
 		if uint64(len)*uint64(size) > uint64(m) {
 			return m, ErrMaxBytesExceeded
 		}
+		if int(len*size) < 0 {
+			return m, ErrLengthOverflow
+		}
 		m -= int(len * size)
 
 		// Read slice
 		valOf.Set(reflect.MakeSlice(valOf.Type(), int(len), int(len)))
 		for i := 0; i < int(len); i++ {
-			m, err = Unmarshal(r, valOf.Index(i).Addr().Interface(), m)
+			if v, ok := valOf.Index(i).Interface().(Unmarshaler); ok {
+				m, err = v.Unmarshal(r, m)
+			} else {
+				m, err = Unmarshal(r, valOf.Index(i).Addr().Interface(), m)
+			}
 			if err != nil {
 				return m, err
 			}
@@ -722,6 +729,9 @@ func Unmarshal(r io.Reader, v interface{}, m int) (int, error) {
 		size := uint32(valOf.Type().Key().Size() + valOf.Type().Elem().Size())
 		if uint64(len)*uint64(size) > uint64(m) {
 			return m, ErrMaxBytesExceeded
+		}
+		if int(len*size) < 0 {
+			return m, ErrLengthOverflow
 		}
 		m -= int(len * size)
 
