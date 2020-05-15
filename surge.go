@@ -244,6 +244,11 @@ func Marshal(w io.Writer, v interface{}, m int) (int, error) {
 		return m, ErrMaxBytesExceeded
 	}
 
+	// Marshal types that implement the Marshaler interface.
+	if interf, ok := v.(Marshaler); ok {
+		return interf.Marshal(w, m)
+	}
+
 	// Marshal byte slices.
 	if v, ok := v.([]byte); ok {
 		if m < 4+len(v) {
@@ -259,11 +264,6 @@ func Marshal(w io.Writer, v interface{}, m int) (int, error) {
 		return m - n1 - n2, err
 	}
 
-	// Marshal types that implement the Marshaler interface.
-	if interf, ok := v.(Marshaler); ok {
-		return interf.Marshal(w, m)
-	}
-
 	// Marshal pointers by flattening them.
 	valOf := reflect.ValueOf(v)
 	if valOf.Type().Kind() == reflect.Ptr {
@@ -271,112 +271,114 @@ func Marshal(w io.Writer, v interface{}, m int) (int, error) {
 	}
 
 	// Marshal by kind.
-	switch reflect.TypeOf(v).Kind() {
+	switch valOf.Kind() {
 	case reflect.String:
-		v := v.(string)
-		if m < 4+len(v) {
+		len := valOf.Len()
+		if m < 4+len {
 			return m, ErrMaxBytesExceeded
 		}
 		bs := [4]byte{}
-		binary.BigEndian.PutUint32(bs[:], uint32(len(v)))
+		binary.BigEndian.PutUint32(bs[:], uint32(len))
 		n1, err := w.Write(bs[:])
 		if err != nil {
 			return m - n1, err
 		}
-		n2, err := w.Write([]byte(v))
+		n2, err := w.Write([]byte(valOf.String()))
 		return m - n1 - n2, err
 
 	case reflect.Bool:
-		v := v.(bool)
 		if m < 1 {
 			return m, ErrMaxBytesExceeded
 		}
 		bs := [1]byte{0}
-		if v {
+		if valOf.Bool() {
 			bs[0] = 1
 		}
 		n, err := w.Write(bs[:])
 		return m - n, err
 
 	case reflect.Int8:
-		v := v.(int8)
 		if m < 1 {
 			return m, ErrMaxBytesExceeded
 		}
-		bs := [1]byte{byte(v)}
+		bs := [1]byte{byte(valOf.Int())}
 		n, err := w.Write(bs[:])
 		return m - n, err
 
 	case reflect.Int16:
-		v := v.(int16)
 		if m < 2 {
 			return m, ErrMaxBytesExceeded
 		}
 		bs := [2]byte{}
-		binary.BigEndian.PutUint16(bs[:], uint16(v))
+		binary.BigEndian.PutUint16(bs[:], uint16(valOf.Int()))
 		n, err := w.Write(bs[:])
 		return m - n, err
 
 	case reflect.Int32:
-		v := v.(int32)
 		if m < 4 {
 			return m, ErrMaxBytesExceeded
 		}
 		bs := [4]byte{}
-		binary.BigEndian.PutUint32(bs[:], uint32(v))
+		binary.BigEndian.PutUint32(bs[:], uint32(valOf.Int()))
 		n, err := w.Write(bs[:])
 		return m - n, err
 
 	case reflect.Int64:
-		v := v.(int64)
 		if m < 8 {
 			return m, ErrMaxBytesExceeded
 		}
 		bs := [8]byte{}
-		binary.BigEndian.PutUint64(bs[:], uint64(v))
+		binary.BigEndian.PutUint64(bs[:], uint64(valOf.Int()))
 		n, err := w.Write(bs[:])
 		return m - n, err
 
 	case reflect.Uint8:
-		v := v.(uint8)
 		if m < 1 {
 			return m, ErrMaxBytesExceeded
 		}
-		bs := [1]byte{byte(v)}
+		bs := [1]byte{byte(valOf.Uint())}
 		n, err := w.Write(bs[:])
 		return m - n, err
 
 	case reflect.Uint16:
-		v := v.(uint16)
 		if m < 2 {
 			return m, ErrMaxBytesExceeded
 		}
 		bs := [2]byte{}
-		binary.BigEndian.PutUint16(bs[:], v)
+		binary.BigEndian.PutUint16(bs[:], uint16(valOf.Uint()))
 		n, err := w.Write(bs[:])
 		return m - n, err
 
 	case reflect.Uint32:
-		v := v.(uint32)
 		if m < 4 {
 			return m, ErrMaxBytesExceeded
 		}
 		bs := [4]byte{}
-		binary.BigEndian.PutUint32(bs[:], v)
+		binary.BigEndian.PutUint32(bs[:], uint32(valOf.Uint()))
 		n, err := w.Write(bs[:])
 		return m - n, err
 
 	case reflect.Uint64:
-		v := v.(uint64)
 		if m < 8 {
 			return m, ErrMaxBytesExceeded
 		}
 		bs := [8]byte{}
-		binary.BigEndian.PutUint64(bs[:], v)
+		binary.BigEndian.PutUint64(bs[:], uint64(valOf.Uint()))
 		n, err := w.Write(bs[:])
 		return m - n, err
 
-	case reflect.Array, reflect.Slice:
+	case reflect.Array:
+		err := error(nil)
+		len := valOf.Len()
+		for i := 0; i < len; i++ {
+			m, err = Marshal(w, valOf.Index(i).Interface(), m)
+			if err != nil {
+				return m, err
+			}
+		}
+		return m, nil
+
+	case reflect.Slice:
 		len := valOf.Len()
 		m, err := Marshal(w, uint32(len), m)
 		if err != nil {
@@ -447,6 +449,11 @@ func Unmarshal(r io.Reader, v interface{}, m int) (int, error) {
 		return m, ErrMaxBytesExceeded
 	}
 
+	// Unmarshal types that implement the Unmarshaler interface.
+	if interf, ok := v.(Unmarshaler); ok {
+		return interf.Unmarshal(r, m)
+	}
+
 	// Unmarshal byte slices.
 	if v, ok := v.(*[]byte); ok {
 		// Read length of bytes
@@ -474,11 +481,6 @@ func Unmarshal(r io.Reader, v interface{}, m int) (int, error) {
 		return m, err
 	}
 
-	// Unmarshal types that implement the Unmarshaler interface.
-	if interf, ok := v.(Unmarshaler); ok {
-		return interf.Unmarshal(r, m)
-	}
-
 	// Check that we are unmarshaling into a pointer.
 	valOf := reflect.ValueOf(v)
 	if valOf.Type().Kind() != reflect.Ptr {
@@ -486,9 +488,8 @@ func Unmarshal(r io.Reader, v interface{}, m int) (int, error) {
 	}
 
 	// Unmarshal by kind.
-	switch valOf := reflect.Indirect(valOf); valOf.Type().Kind() {
+	switch valOf := reflect.Indirect(valOf); valOf.Kind() {
 	case reflect.String:
-		v := v.(*string)
 		// Read length of string
 		if m < 4 {
 			return m, ErrMaxBytesExceeded
@@ -515,147 +516,122 @@ func Unmarshal(r io.Reader, v interface{}, m int) (int, error) {
 			return m, err
 		}
 		// Read string
-		*v = string(data)
+		valOf.SetString(string(data))
 		return m, nil
 
 	case reflect.Bool:
 		if m < 1 {
 			return m, ErrMaxBytesExceeded
 		}
-		v := v.(*bool)
 		bs := [1]byte{}
 		n, err := io.ReadFull(r, bs[:])
 		if err != nil {
 			return m - n, err
 		}
-		*v = bs[0] != 0
+		valOf.SetBool(bs[0] != 0)
 		return m - n, nil
 
 	case reflect.Int8:
 		if m < 1 {
 			return m, ErrMaxBytesExceeded
 		}
-		v := v.(*int8)
 		bs := [1]byte{}
 		n, err := io.ReadFull(r, bs[:])
 		if err != nil {
 			return m - n, err
 		}
-		*v = int8(bs[0])
+		valOf.SetInt(int64(bs[0]))
 		return m - n, nil
 
 	case reflect.Int16:
 		if m < 2 {
 			return m, ErrMaxBytesExceeded
 		}
-		v := v.(*int16)
 		bs := [2]byte{}
 		n, err := io.ReadFull(r, bs[:])
 		if err != nil {
 			return m - n, err
 		}
-		*v = int16(binary.BigEndian.Uint16(bs[:]))
+		valOf.SetInt(int64(binary.BigEndian.Uint16(bs[:])))
 		return m - n, nil
 
 	case reflect.Int32:
 		if m < 4 {
 			return m, ErrMaxBytesExceeded
 		}
-		v := v.(*int32)
 		bs := [4]byte{}
 		n, err := io.ReadFull(r, bs[:])
 		if err != nil {
 			return m - n, err
 		}
-		*v = int32(binary.BigEndian.Uint32(bs[:]))
+		valOf.SetInt(int64(binary.BigEndian.Uint32(bs[:])))
 		return m - n, nil
 
 	case reflect.Int64:
 		if m < 8 {
 			return m, ErrMaxBytesExceeded
 		}
-		v := v.(*int64)
 		bs := [8]byte{}
 		n, err := io.ReadFull(r, bs[:])
 		if err != nil {
 			return m - n, err
 		}
-		*v = int64(binary.BigEndian.Uint64(bs[:]))
+		valOf.SetInt(int64(binary.BigEndian.Uint64(bs[:])))
 		return m - n, nil
 
 	case reflect.Uint8:
 		if m < 1 {
 			return m, ErrMaxBytesExceeded
 		}
-		v := v.(*uint8)
 		bs := [1]byte{}
 		n, err := io.ReadFull(r, bs[:])
 		if err != nil {
 			return m - n, err
 		}
-		*v = uint8(bs[0])
+		valOf.SetUint(uint64(bs[0]))
 		return m - n, nil
 
 	case reflect.Uint16:
 		if m < 2 {
 			return m, ErrMaxBytesExceeded
 		}
-		v := v.(*uint16)
 		bs := [2]byte{}
 		n, err := io.ReadFull(r, bs[:])
 		if err != nil {
 			return m - n, err
 		}
-		*v = binary.BigEndian.Uint16(bs[:])
+		valOf.SetUint(uint64(binary.BigEndian.Uint16(bs[:])))
 		return m - n, nil
 
 	case reflect.Uint32:
 		if m < 4 {
 			return m, ErrMaxBytesExceeded
 		}
-		v := v.(*uint32)
 		bs := [4]byte{}
 		n, err := io.ReadFull(r, bs[:])
 		if err != nil {
 			return m - n, err
 		}
-		*v = binary.BigEndian.Uint32(bs[:])
+		valOf.SetUint(uint64(binary.BigEndian.Uint32(bs[:])))
 		return m - n, nil
 
 	case reflect.Uint64:
 		if m < 8 {
 			return m, ErrMaxBytesExceeded
 		}
-		v := v.(*uint64)
 		bs := [8]byte{}
 		n, err := io.ReadFull(r, bs[:])
 		if err != nil {
 			return m - n, err
 		}
-		*v = binary.BigEndian.Uint64(bs[:])
+		valOf.SetUint(uint64(binary.BigEndian.Uint64(bs[:])))
 		return m - n, nil
 
 	case reflect.Array:
-		// Read length of array
-		if m < 4 {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [4]byte{}
-		n, err := io.ReadFull(r, bs[:])
-		if err != nil {
-			return m - n, err
-		}
-		m -= 4
-		len := binary.BigEndian.Uint32(bs[:])
-		// Check length
-		if int(len) < 0 {
-			return m, ErrLengthOverflow
-		}
-		if valOf.Len() != int(len) {
-			return m, newErrBadLength(uint32(valOf.Len()), len)
-		}
 		// Read array elements
-		for i := 0; i < int(len); i++ {
+		err := error(nil)
+		len := valOf.Len()
+		for i := 0; i < len; i++ {
 			m, err = Unmarshal(r, valOf.Index(i).Addr().Interface(), m)
 			if err != nil {
 				return m, err
