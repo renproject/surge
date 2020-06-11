@@ -19,12 +19,12 @@ var _ = Describe("Boolean", func() {
 					r := rand.New(rand.NewSource(time.Now().UnixNano()))
 					f := func(x bool) bool {
 						excess := r.Int() % 100
-						buf := make([]byte, 1+excess)
-						rem := 1 + excess
+						buf := make([]byte, surge.SizeHintBool+excess)
+						rem := surge.SizeHintBool + excess
 
-						tail, rem, err := surge.MarshalBool(x, buf, rem)
+						tail, tailRem, err := surge.MarshalBool(x, buf, rem)
 						Expect(tail).To(HaveLen(excess))
-						Expect(rem).To(Equal(excess))
+						Expect(tailRem).To(Equal(excess))
 						Expect(err).ToNot(HaveOccurred())
 
 						if x {
@@ -43,12 +43,12 @@ var _ = Describe("Boolean", func() {
 					r := rand.New(rand.NewSource(time.Now().UnixNano()))
 					f := func(x bool) bool {
 						excess := r.Int() % 100
-						buf := make([]byte, 1+excess)
-						rem := 0
+						buf := make([]byte, surge.SizeHintBool+excess)
+						rem := surge.SizeHintBool - 1
 
-						tail, rem, err := surge.MarshalBool(x, buf, rem)
-						Expect(tail).To(HaveLen(1 + excess))
-						Expect(rem).To(Equal(0))
+						tail, tailRem, err := surge.MarshalBool(x, buf, rem)
+						Expect(tail).To(HaveLen(len(buf)))
+						Expect(tailRem).To(Equal(rem))
 						Expect(err).To(Equal(surge.ErrUnexpectedEndOfBuffer))
 						return true
 					}
@@ -62,12 +62,12 @@ var _ = Describe("Boolean", func() {
 				r := rand.New(rand.NewSource(time.Now().UnixNano()))
 				f := func(x bool) bool {
 					excess := r.Int() % 100
-					buf := make([]byte, 0)
-					rem := 1 + excess
+					buf := make([]byte, surge.SizeHintBool-1)
+					rem := surge.SizeHintBool + excess
 
-					tail, rem, err := surge.MarshalBool(x, buf, rem)
-					Expect(tail).To(HaveLen(0))
-					Expect(rem).To(Equal(1 + excess))
+					tail, tailRem, err := surge.MarshalBool(x, buf, rem)
+					Expect(tail).To(HaveLen(len(buf)))
+					Expect(tailRem).To(Equal(rem))
 					Expect(err).To(Equal(surge.ErrUnexpectedEndOfBuffer))
 					return true
 				}
@@ -82,8 +82,8 @@ var _ = Describe("Boolean", func() {
 				r := rand.New(rand.NewSource(time.Now().UnixNano()))
 				f := func(data []byte) bool {
 					excess := r.Int() % 100
-					buf := make([]byte, 1+excess)
-					rem := 1 + excess
+					buf := make([]byte, surge.SizeHintBool+excess)
+					rem := surge.SizeHintBool + excess
 
 					x := false
 					Expect(func() { surge.UnmarshalBool(&x, buf, rem) }).ToNot(Panic())
@@ -99,12 +99,12 @@ var _ = Describe("Boolean", func() {
 					r := rand.New(rand.NewSource(time.Now().UnixNano()))
 					f := func(buf [100]byte) bool {
 						excess := r.Int() % 100
-						rem := 1 + excess
+						rem := surge.SizeHintBool + excess
 
 						x := false
-						tail, rem, err := surge.UnmarshalBool(&x, buf[:], rem)
-						Expect(tail).To(HaveLen(99))
-						Expect(rem).To(Equal(excess))
+						tail, tailRem, err := surge.UnmarshalBool(&x, buf[:], rem)
+						Expect(tail).To(HaveLen(len(buf) - surge.SizeHintBool))
+						Expect(tailRem).To(Equal(excess))
 						Expect(err).ToNot(HaveOccurred())
 
 						if buf[0] == 0 {
@@ -121,11 +121,11 @@ var _ = Describe("Boolean", func() {
 			Context("when there are not sufficient remaining bytes", func() {
 				It("should return an error", func() {
 					f := func(buf [100]byte) bool {
-						rem := 0
+						rem := surge.SizeHintBool - 1
 						x := false
-						tail, rem, err := surge.UnmarshalBool(&x, buf[:], rem)
-						Expect(tail).To(HaveLen(100))
-						Expect(rem).To(Equal(0))
+						tail, tailRem, err := surge.UnmarshalBool(&x, buf[:], rem)
+						Expect(tail).To(HaveLen(len(buf)))
+						Expect(tailRem).To(Equal(rem))
 						Expect(err).To(Equal(surge.ErrUnexpectedEndOfBuffer))
 						return true
 					}
@@ -137,14 +137,14 @@ var _ = Describe("Boolean", func() {
 		Context("when the buffer is not big enough", func() {
 			It("should return an error", func() {
 				r := rand.New(rand.NewSource(time.Now().UnixNano()))
-				f := func() bool {
+				f := func(buf [surge.SizeHintBool - 1]byte) bool {
 					excess := r.Int() % 100
-					rem := 1 + excess
+					rem := surge.SizeHintBool + excess
 
 					x := false
-					tail, rem, err := surge.UnmarshalBool(&x, []byte{}, rem)
-					Expect(tail).To(HaveLen(0))
-					Expect(rem).To(Equal(1 + excess))
+					tail, tailRem, err := surge.UnmarshalBool(&x, buf[:], rem)
+					Expect(tail).To(HaveLen(len(buf)))
+					Expect(tailRem).To(Equal(rem))
 					Expect(err).To(Equal(surge.ErrUnexpectedEndOfBuffer))
 					return true
 				}

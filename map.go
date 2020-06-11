@@ -89,7 +89,7 @@ func marshalReflectedMap(v reflect.Value, buf []byte, rem int) ([]byte, int, err
 		// lengths.
 		keyDataLen := len(keyValue.keyData)
 		if len(buf) < keyDataLen {
-			return buf, rem, ErrMaxBytesExceeded
+			return buf, rem, ErrUnexpectedEndOfBuffer
 		}
 		copy(buf, keyValue.keyData)
 		buf = buf[keyDataLen:]
