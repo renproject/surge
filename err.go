@@ -5,6 +5,14 @@ import (
 	"fmt"
 )
 
+// ErrUnexpectedEndOfBuffer is used when reading/writing from/to a buffer that
+// has less spaced than expected.
+var ErrUnexpectedEndOfBuffer = errors.New("unexpected end of buffer")
+
+// ErrNotComparable is used when sorting maps that do not have comparable key
+// types.
+var ErrNotComparable = errors.New("not comparable")
+
 // ErrMaxBytesExceeded is returned when too many bytes need to be allocated in
 // memory.
 var ErrMaxBytesExceeded = errors.New("max bytes exceeded")
