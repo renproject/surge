@@ -13,7 +13,7 @@ func sizeHintReflectedArray(v reflect.Value) int {
 }
 
 func marshalReflectedArray(v reflect.Value, buf []byte, rem int) ([]byte, int, error) {
-	arrayLen := v.Type().Len()
+	arrayLen := v.Len()
 	if len(buf) < arrayLen || rem < arrayLen {
 		return buf, rem, ErrUnexpectedEndOfBuffer
 	}
@@ -27,13 +27,14 @@ func marshalReflectedArray(v reflect.Value, buf []byte, rem int) ([]byte, int, e
 }
 
 func unmarshalReflectedArray(v reflect.Value, buf []byte, rem int) ([]byte, int, error) {
-	arrayLen := v.Elem().Len()
+	elem := v.Elem()
+	arrayLen := elem.Len()
 	if len(buf) < arrayLen || rem < arrayLen {
 		return buf, rem, ErrUnexpectedEndOfBuffer
 	}
 	var err error
 	for i := 0; i < arrayLen; i++ {
-		if buf, rem, err = unmarshalReflected(v.Index(i).Addr(), buf, rem); err != nil {
+		if buf, rem, err = unmarshalReflected(elem.Index(i).Addr(), buf, rem); err != nil {
 			return buf, rem, err
 		}
 	}
