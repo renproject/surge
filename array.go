@@ -27,7 +27,7 @@ func marshalReflectedArray(v reflect.Value, buf []byte, rem int) ([]byte, int, e
 }
 
 func unmarshalReflectedArray(v reflect.Value, buf []byte, rem int) ([]byte, int, error) {
-	arrayLen := v.Type().Len()
+	arrayLen := v.Elem().Len()
 	if len(buf) < arrayLen || rem < arrayLen {
 		return buf, rem, ErrUnexpectedEndOfBuffer
 	}
