@@ -32,11 +32,13 @@ func unmarshalReflectedSlice(v reflect.Value, buf []byte, rem int) ([]byte, int,
 		return buf, rem, err
 	}
 
+	elem := v.Elem()
+
 	n := int(sliceLen)
 	if n < 0 {
 		return buf, rem, ErrLengthOverflow
 	}
-	n *= int(v.Type().Elem().Size())
+	n *= int(elem.Elem().Type().Size())
 	if n < 0 {
 		return buf, rem, ErrLengthOverflow
 	}
@@ -45,9 +47,9 @@ func unmarshalReflectedSlice(v reflect.Value, buf []byte, rem int) ([]byte, int,
 	}
 	rem -= n
 
-	v.Set(reflect.MakeSlice(v.Type(), int(sliceLen), int(sliceLen)))
+	v.Set(reflect.MakeSlice(elem.Type(), int(sliceLen), int(sliceLen)))
 	for i := uint16(0); i < sliceLen; i++ {
-		if buf, rem, err = unmarshalReflected(v.Index(int(i)).Addr(), buf, rem); err != nil {
+		if buf, rem, err = unmarshalReflected(elem.Index(int(i)).Addr(), buf, rem); err != nil {
 			return buf, rem, err
 		}
 	}
