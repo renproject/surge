@@ -30,9 +30,10 @@ func marshalReflectedStruct(v reflect.Value, buf []byte, rem int) ([]byte, int, 
 
 func unmarshalReflectedStruct(v reflect.Value, buf []byte, rem int) ([]byte, int, error) {
 	var err error
-	numField := v.Type().Elem().NumField()
+	indirected := reflect.Indirect(v)
+	numField := indirected.Type().Elem().NumField()
 	for i := 0; i < numField; i++ {
-		if f := v.Field(i); f.IsValid() {
+		if f := indirected.Field(i); f.IsValid() {
 			if buf, rem, err = unmarshalReflected(f.Addr(), buf, rem); err != nil {
 				return buf, rem, err
 			}
