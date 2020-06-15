@@ -38,7 +38,7 @@ func unmarshalReflectedSlice(v reflect.Value, buf []byte, rem int) ([]byte, int,
 	if n < 0 {
 		return buf, rem, ErrLengthOverflow
 	}
-	n *= int(elem.Elem().Type().Size())
+	n *= int(elem.Type().Elem().Size())
 	if n < 0 {
 		return buf, rem, ErrLengthOverflow
 	}
