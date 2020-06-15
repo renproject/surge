@@ -61,6 +61,10 @@ type MarshalUnmarshaler interface {
 	Unmarshaler
 }
 
+func SizeHint(v interface{}) int {
+	return sizeHintReflected(reflect.ValueOf(v))
+}
+
 func Marshal(v interface{}, buf []byte, rem int) ([]byte, int, error) {
 	return marshalReflected(reflect.ValueOf(v), buf, rem)
 }

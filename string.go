@@ -75,6 +75,6 @@ func unmarshalReflectedString(v reflect.Value, buf []byte, rem int) ([]byte, int
 	if _, err := b.Write(buf[:n]); err != nil {
 		return buf[:n], rem - n, err
 	}
-	v.SetString(b.String())
+	v.Elem().SetString(b.String())
 	return buf[n:], rem - n, nil
 }
