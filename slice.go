@@ -33,7 +33,6 @@ func unmarshalReflectedSlice(v reflect.Value, buf []byte, rem int) ([]byte, int,
 	}
 
 	elem := v.Elem()
-
 	n := int(sliceLen)
 	if n < 0 {
 		return buf, rem, ErrLengthOverflow
@@ -47,7 +46,7 @@ func unmarshalReflectedSlice(v reflect.Value, buf []byte, rem int) ([]byte, int,
 	}
 	rem -= n
 
-	v.Set(reflect.MakeSlice(elem.Type(), int(sliceLen), int(sliceLen)))
+	elem.Set(reflect.MakeSlice(elem.Type(), int(sliceLen), int(sliceLen)))
 	for i := uint16(0); i < sliceLen; i++ {
 		if buf, rem, err = unmarshalReflected(elem.Index(int(i)).Addr(), buf, rem); err != nil {
 			return buf, rem, err
