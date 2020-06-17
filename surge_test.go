@@ -1,12 +1,17 @@
 package surge_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"math/rand"
 	"testing"
+	"testing/quick"
 	"time"
 
 	"github.com/renproject/surge"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 type Point struct {
@@ -186,3 +191,40 @@ func BenchmarkFoo(b *testing.B) {
 		}
 	}
 }
+
+var _ = Describe("Marshal", func() {
+	Context("when marshaling pointers", func() {
+		It("should be the same as marshaling the underlying type", func() {
+			f := func(x string) bool {
+				buf := make([]byte, surge.SizeHint(x))
+				rem := surge.SizeHint(x)
+				_, _, err := surge.Marshal(x, buf, rem)
+				Expect(err).ToNot(HaveOccurred())
+
+				buf2 := make([]byte, surge.SizeHint(&x))
+				rem2 := surge.SizeHint(&x)
+				_, _, err = surge.Marshal(&x, buf2, rem2)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(bytes.Equal(buf, buf2)).To(BeTrue())
+				return true
+			}
+			Expect(quick.Check(f, nil)).To(Succeed())
+		})
+	})
+})
+
+var _ = Describe("Unmarshal", func() {
+	Context("when unmarshaling non-pointers", func() {
+		It("should return an error", func() {
+			f := func(x string) bool {
+				buf := make([]byte, surge.SizeHint(x))
+				rem := surge.SizeHint(x)
+				_, _, err := surge.Unmarshal(x, buf, rem)
+				Expect(err).To(HaveOccurred())
+				return true
+			}
+			Expect(quick.Check(f, nil)).To(Succeed())
+		})
+	})
+})
