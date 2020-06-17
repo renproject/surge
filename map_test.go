@@ -56,23 +56,14 @@ var _ = Describe("Map", func() {
 
 			Context("when there are not sufficient remaining bytes", func() {
 				It("should return an error", func() {
-					r := rand.New(rand.NewSource(time.Now().UnixNano()))
 					f := func(x map[string]string) bool {
-						excess := r.Int() % 100
-						buf := make([]byte, surge.SizeHint(x)+excess)
-
-						rem := surge.SizeHint(x) + 48*len(x) - 1
-						_, _, err := surge.Marshal(x, buf, rem)
-						Expect(err).To(Equal(surge.ErrUnexpectedEndOfBuffer))
-
-						rem = surge.SizeHint(x) - 1
-						_, _, err = surge.Marshal(x, buf, rem)
-						Expect(err).To(Equal(surge.ErrUnexpectedEndOfBuffer))
-
-						rem = 48*len(x) - 1
-						_, _, err = surge.Marshal(x, buf, rem)
-						Expect(err).To(Equal(surge.ErrUnexpectedEndOfBuffer))
-
+						size := surge.SizeHint(x)
+						sizeOfExtraRem := 48 * len(x)
+						buf := make([]byte, size)
+						for rem := 0; rem < size+sizeOfExtraRem; rem++ {
+							_, _, err := surge.Marshal(x, buf, rem)
+							Expect(err).To(Equal(surge.ErrUnexpectedEndOfBuffer))
+						}
 						return true
 					}
 					Expect(quick.Check(f, nil)).To(Succeed())
@@ -82,14 +73,14 @@ var _ = Describe("Map", func() {
 
 		Context("when the buffer is not big enough", func() {
 			It("should return an error", func() {
-				r := rand.New(rand.NewSource(time.Now().UnixNano()))
 				f := func(x map[string]int32) bool {
-					excess := r.Int() % 100
-					buf := make([]byte, surge.SizeHint(x)-1)
-					rem := 2*surge.SizeHint(x) + excess + 48*len(x)
-
-					_, _, err := surge.Marshal(x, buf, rem)
-					Expect(err).To(Equal(surge.ErrUnexpectedEndOfBuffer))
+					size := surge.SizeHint(x)
+					rem := size + 48*len(x)
+					for b := 0; b < size; b++ {
+						buf := make([]byte, b)
+						_, _, err := surge.Marshal(x, buf, rem)
+						Expect(err).To(Equal(surge.ErrUnexpectedEndOfBuffer))
+					}
 					return true
 				}
 				Expect(quick.Check(f, nil)).To(Succeed())

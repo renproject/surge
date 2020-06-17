@@ -34,33 +34,14 @@ var _ = Describe("String", func() {
 			})
 
 			Context("when there are not sufficient remaining bytes", func() {
-				Context("when there are less remaining bytes than the length of the array", func() {
-					It("should not return an error", func() {
-						r := rand.New(rand.NewSource(time.Now().UnixNano()))
-						f := func(x string) bool {
-							excess := r.Int() % 100
-							buf := make([]byte, surge.SizeHintString(x)+excess)
-							rem := surge.SizeHintString(x) - 1
-
-							_, tailRem, err := surge.MarshalString(x, buf, rem)
-							Expect(tailRem).To(BeNumerically("<=", rem))
-							Expect(err).To(HaveOccurred())
-
-							return true
-						}
-						Expect(quick.Check(f, nil)).To(Succeed())
-					})
-				})
-
 				It("should return an error", func() {
-					r := rand.New(rand.NewSource(time.Now().UnixNano()))
 					f := func(x string) bool {
-						excess := r.Int() % 100
-						buf := make([]byte, surge.SizeHintString(x)+excess)
-						rem := surge.SizeHintString(x) - 1
-
-						_, _, err := surge.MarshalString(x, buf, rem)
-						Expect(err).To(Equal(surge.ErrUnexpectedEndOfBuffer))
+						size := surge.SizeHintString(x)
+						buf := make([]byte, size)
+						for rem := 0; rem < size; rem++ {
+							_, _, err := surge.MarshalString(x, buf, rem)
+							Expect(err).To(Equal(surge.ErrUnexpectedEndOfBuffer))
+						}
 						return true
 					}
 					Expect(quick.Check(f, nil)).To(Succeed())
@@ -69,33 +50,15 @@ var _ = Describe("String", func() {
 		})
 
 		Context("when the buffer is not big enough", func() {
-			Context("when the buffer is shorter than the array", func() {
-				It("should not return an error", func() {
-					r := rand.New(rand.NewSource(time.Now().UnixNano()))
-					f := func(x string) bool {
-						excess := r.Int() % 100
-						buf := make([]byte, len(x))
-						rem := surge.SizeHintString(x) + excess
-
-						_, tailRem, err := surge.MarshalString(x, buf, rem)
-						Expect(tailRem).To(BeNumerically("<=", rem))
-						Expect(err).To(HaveOccurred())
-
-						return true
-					}
-					Expect(quick.Check(f, nil)).To(Succeed())
-				})
-			})
-
 			It("should return an error", func() {
-				r := rand.New(rand.NewSource(time.Now().UnixNano()))
 				f := func(x string) bool {
-					excess := r.Int() % 100
-					buf := make([]byte, surge.SizeHintString(x)-1)
-					rem := surge.SizeHintString(x) + excess
-
-					_, _, err := surge.MarshalString(x, buf, rem)
-					Expect(err).To(Equal(surge.ErrUnexpectedEndOfBuffer))
+					size := surge.SizeHintString(x)
+					rem := size
+					for b := 0; b < size; b++ {
+						buf := make([]byte, b)
+						_, _, err := surge.MarshalString(x, buf, rem)
+						Expect(err).To(Equal(surge.ErrUnexpectedEndOfBuffer))
+					}
 					return true
 				}
 				Expect(quick.Check(f, nil)).To(Succeed())
