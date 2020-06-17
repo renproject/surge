@@ -36,7 +36,7 @@ func marshalReflectedMap(v reflect.Value, buf []byte, rem int) ([]byte, int, err
 	// we can then sort the slice, ensuring that the key/value ordering is
 	// deterministic.
 	n := v.Len() * int(unsafe.Sizeof(KeyValue{}))
-	if n < 0 {
+	if n < 0 || n < v.Len() {
 		return buf, rem, ErrLengthOverflow
 	}
 	if rem < n {
