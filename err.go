@@ -6,7 +6,7 @@ import (
 )
 
 // ErrUnexpectedEndOfBuffer is used when reading/writing from/to a buffer that
-// has less spaced than expected.
+// has less space than expected.
 var ErrUnexpectedEndOfBuffer = errors.New("unexpected end of buffer")
 
 // ErrLengthOverflow is returned when the length of an array or slice has
