@@ -22,11 +22,11 @@ var _ = Describe("Map", func() {
 					f := func(x map[int8]int16) bool {
 						excess := r.Int() % 100
 						buf := make([]byte, surge.SizeHint(x)+excess)
-						rem := surge.SizeHint(x) + excess + 48*len(x)
+						rem := surge.SizeHint(x) + 48*len(x) + excess
 
 						tail, tailRem, err := surge.Marshal(x, buf, rem)
 						Expect(tail).To(HaveLen(excess))
-						Expect(tailRem).To(BeNumerically("<=", rem))
+						Expect(tailRem).To(Equal(excess))
 						Expect(err).ToNot(HaveOccurred())
 
 						return true
