@@ -35,24 +35,19 @@ var _ = Describe("Map", func() {
 				})
 
 				It("should return the same bytes for multiple marshals", func() {
-					r := rand.New(rand.NewSource(time.Now().UnixNano()))
-					f := func(x map[string]map[string]string) bool {
-						excess := r.Int() % 100
-						buf := make([]byte, surge.SizeHint(x)+excess)
-						rem := 2*surge.SizeHint(x) + excess + 48*len(x)
-
+					f := func(x map[string]string) bool {
+						buf := make([]byte, surge.SizeHint(x))
+						rem := surge.SizeHint(x) + 48*len(x)
 						_, _, err := surge.Marshal(x, buf, rem)
 						Expect(err).ToNot(HaveOccurred())
 
 						for i := 0; i < 10; i++ {
-							buf2 := make([]byte, surge.SizeHint(x)+excess)
-							rem2 := 2*surge.SizeHint(x) + excess + 48*len(x)
-
+							buf2 := make([]byte, surge.SizeHint(x))
+							rem2 := surge.SizeHint(x) + 48*len(x)
 							_, _, err := surge.Marshal(x, buf2, rem2)
 							Expect(err).ToNot(HaveOccurred())
 							Expect(bytes.Equal(buf, buf2)).To(BeTrue())
 						}
-
 						return true
 					}
 					Expect(quick.Check(f, nil)).To(Succeed())
