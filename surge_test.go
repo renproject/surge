@@ -192,7 +192,49 @@ func BenchmarkFoo(b *testing.B) {
 	}
 }
 
+type Bar int64
+
+func (Bar) SizeHint() int {
+	return 42
+}
+
+func (Bar) Marshal(buf []byte, rem int) ([]byte, int, error) {
+	copy(buf, []byte{0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42})
+	return buf[:42], rem - 42, nil
+}
+
+func (bar *Bar) Unmarshal(buf []byte, rem int) ([]byte, int, error) {
+	bytes := [42]byte{}
+	copy(bytes[:], buf[:42])
+	*bar = 42
+	return buf[:42], rem - 42, nil
+}
+
+var _ = Describe("Size hint", func() {
+	Context("when a custom implementation exists", func() {
+		It("should use the custom implementation", func() {
+			Expect(surge.SizeHint(Bar(42))).To(Equal(Bar(42).SizeHint()))
+		})
+	})
+})
+
 var _ = Describe("Marshal", func() {
+	Context("when a custom implementation exists", func() {
+		It("should use the custom implementation", func() {
+			buf := [42]byte{}
+			rem := 42
+			_, _, err := surge.Marshal(Bar(42), buf[:], rem)
+			Expect(err).ToNot(HaveOccurred())
+
+			buf2 := [42]byte{}
+			rem2 := 42
+			_, _, err = Bar(42).Marshal(buf2[:], rem2)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(bytes.Equal(buf[:], buf2[:])).To(BeTrue())
+		})
+	})
+
 	Context("when marshaling pointers", func() {
 		It("should be the same as marshaling the underlying type", func() {
 			f := func(x string) bool {
@@ -215,6 +257,24 @@ var _ = Describe("Marshal", func() {
 })
 
 var _ = Describe("Unmarshal", func() {
+	Context("when a custom implementation exists", func() {
+		It("should use the custom implementation", func() {
+			bar := Bar(0)
+			buf := [42]byte{}
+			rem := 42
+			_, _, err := surge.Unmarshal(&bar, buf[:], rem)
+			Expect(err).ToNot(HaveOccurred())
+
+			bar2 := Bar(1)
+			buf2 := [42]byte{}
+			rem2 := 42
+			_, _, err = bar2.Unmarshal(buf2[:], rem2)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(bar).To(Equal(bar2))
+		})
+	})
+
 	Context("when unmarshaling non-pointers", func() {
 		It("should return an error", func() {
 			f := func(x string) bool {
