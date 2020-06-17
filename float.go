@@ -20,7 +20,7 @@ const (
 // quota. An error is returned if the byte slice is too small, or if the
 // remainin memory quote is insufficient.
 func MarshalF32(x float32, buf []byte, rem int) ([]byte, int, error) {
-	if len(buf) < SizeHintI32 || rem < SizeHintF32 {
+	if len(buf) < SizeHintF32 || rem < SizeHintF32 {
 		return buf, rem, ErrUnexpectedEndOfBuffer
 	}
 	binary.BigEndian.PutUint32(buf, math.Float32bits(x))
