@@ -1,7 +1,6 @@
 package surge
 
 import (
-	"io"
 	"reflect"
 	"unsafe"
 )
@@ -29,30 +28,6 @@ type Marshaler interface {
 type Unmarshaler interface {
 	// Unmarshal this value from bytes.
 	Unmarshal(buf []byte, rem int) ([]byte, int, error)
-}
-
-// A Sinker can stream itself into an IO writer. It will have the same format as
-// when it is marshaling, but it will write directly into the IO writer. This is
-// particularly useful for writing into size-limited IO buffers.
-type Sinker interface {
-	SizeHinter
-
-	// Sink the bytes of this value into an IO writer.
-	Sink(io.Writer) error
-}
-
-// A Streamer can stream from an IO reader into itself. It will expect the same
-// format as when it is unmarshaling, but it will read directly from the IO
-// reader. This is particularly useful for reading from size-limited IO buffers.
-type Streamer interface {
-	// Stream bytes from an IO reader into this value.
-	Stream(io.Reader) error
-}
-
-// A SinkStreamer is a sinker and a streamer.
-type SinkStreamer interface {
-	Sinker
-	Streamer
 }
 
 // A MarshalUnmarshaler is a marshaler and an unmarshaler.
