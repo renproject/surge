@@ -36,14 +36,84 @@ type MarshalUnmarshaler interface {
 	Unmarshaler
 }
 
+// SizeHint returns the number of bytes required to store a value in its binary
+// representation. This is the number of bytes "on the wire", not the number of
+// bytes that need to be allocated during marshaling/unmarshaling (which can be
+// different, depending on the representation of the value). SizeHint supports
+// all scalars, strings, arrays, slices, maps, structs, and custom
+// implementations (for types that implement the SizeHinter interface). If the
+// type is not supported, then zero is returned. If the value is a pointer, then
+// the size of the underlying value being pointed to will be returned.
+//
+//  x := int64(0)
+//  sizeHint := surge.SizeHint(x)
+//  if sizeHint != 8 {
+//      panic("assertion failed: size of int64 must be 8 bytes")
+//  }
+//
 func SizeHint(v interface{}) int {
 	return sizeHintReflected(reflect.ValueOf(v))
 }
 
+// Marshal a value into its binary representation, and store the value in a byte
+// slice. The "remaining memory quota" defines the maximum amount of bytes that
+// can be allocated on the heap when marshaling the value. In this way, the
+// remaining memory quota can be used to avoid allocating too much memory during
+// marshaling. Marshaling supports all scalars, strings, arrays, slices, maps,
+// structs, and custom implementations (for types that implement the Marshaler
+// interface). After marshaling, the unconsumed tail of the byte slice, and the
+// remaining memory quota, are returned. If the byte slice is too small, then an
+// error is returned. Similarly, if the remaining memory quote is too small,
+// then an error is returned. If the type is not supported, then an error is
+// returned. An error does not imply that nothing from the byte slice, or
+// remaining memory quota, was consumed. If the value is a pointer, then the
+// underlying value being pointed to will be marshaled.
+//
+//  x := int64(0)
+//  buf := make([]byte, 8)
+//  tail, rem, err := surge.Marshal(x, buf, 8)
+//  if len(tail) != 0 {
+//      panic("assertion failed: int64 must consume 8 bytes")
+//  }
+//  if rem != 0 {
+//      panic("assertion failed: int64 must consume 8 bytes of the memory quota")
+//  }
+//  if err != nil {
+//      panic(fmt.Errorf("assertion failed: %v", err))
+//  }
+//
 func Marshal(v interface{}, buf []byte, rem int) ([]byte, int, error) {
 	return marshalReflected(reflect.ValueOf(v), buf, rem)
 }
 
+// Unmarshal a value from its binary representation by reading from a byte
+// slice. The "remaining memory quota" defines the maximum amount of bytes that
+// can be allocated on the heap when unmarshaling the value. In this way, the
+// remaining memory quota can be used to avoid allocating too much memory during
+// unmarshaling (this is particularly useful when dealing with potentially
+// malicious input). Unmarshaling supports pointers to all scalars, strings,
+// arrays, slices, maps, structs, and custom implementations (for types that
+// implement the Unmarshaler interface). After unmarshaling, the unconsumed tail
+// of the byte slice, and the remaining memory quota, are returned. If the byte
+// slice is too small, then an error is returned. Similarly, if the remaining
+// memory quote is too small, then an error is returned. If the type is not a
+// pointer to one of the supported types, then an error is returned. An error
+// does not imply that nothing from the byte slice, or remaining memory quota,
+// was consumed. If the value is not a pointer, then an error is returned.
+//
+//  x := int64(0)
+//  buf := make([]byte, 8)
+//  tail, rem, err := surge.Unmarshal(&x, buf, 8)
+//  if len(tail) != 0 {
+//      panic("assertion failed: int64 must consume 8 bytes")
+//  }
+//  if rem != 0 {
+//      panic("assertion failed: int64 must consume 8 bytes of the memory quota")
+//  }
+//  if err != nil {
+//      panic(fmt.Errorf("assertion failed: %v", err))
+//  }
+//
 func Unmarshal(v interface{}, buf []byte, rem int) ([]byte, int, error) {
 	valueOf := reflect.ValueOf(v)
 	if valueOf.Kind() != reflect.Ptr {
