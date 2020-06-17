@@ -5,9 +5,9 @@ import (
 	"fmt"
 )
 
-// ErrMaxBytesExceeded is returned when too many bytes need to be allocated in
-// memory.
-var ErrMaxBytesExceeded = errors.New("max bytes exceeded")
+// ErrUnexpectedEndOfBuffer is used when reading/writing from/to a buffer that
+// has less space than expected.
+var ErrUnexpectedEndOfBuffer = errors.New("unexpected end of buffer")
 
 // ErrLengthOverflow is returned when the length of an array or slice has
 // overflowed.
@@ -19,7 +19,7 @@ type ErrUnsupportedMarshalType struct {
 	error
 }
 
-func newErrUnsupportedMarshalType(v interface{}) error {
+func NewErrUnsupportedMarshalType(v interface{}) error {
 	return ErrUnsupportedMarshalType{error: fmt.Errorf("marshal error: unsupported type %T", v)}
 }
 
@@ -29,16 +29,6 @@ type ErrUnsupportedUnmarshalType struct {
 	error
 }
 
-func newErrUnsupportedUnmarshalType(v interface{}) error {
+func NewErrUnsupportedUnmarshalType(v interface{}) error {
 	return ErrUnsupportedUnmarshalType{error: fmt.Errorf("unmarshal error: unsupported type %T", v)}
-}
-
-// ErrBadLength is returned when unmarshaling into an array with the wrong
-// length.
-type ErrBadLength struct {
-	error
-}
-
-func newErrBadLength(expected, got uint32) error {
-	return ErrBadLength{error: fmt.Errorf("unmarshal error: expected len=%v, got len=%v", expected, got)}
 }

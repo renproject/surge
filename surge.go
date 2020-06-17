@@ -1,736 +1,282 @@
 package surge
 
 import (
-	"bytes"
-	"encoding/binary"
-	"io"
 	"reflect"
-	"sort"
+	"unsafe"
 )
 
-// MaxBytes is set to 8 MB by default.
-const MaxBytes = int(8 * 1024 * 1024)
+// MaxBytes is set to 64 MB by default.
+const MaxBytes = int(64 * 1024 * 1024)
 
-// Surger defines a union of the marshaler, unmarshaler, and size hinter
-// interfaces.
-type Surger interface {
-	SizeHint() int
-	Marshal(io.Writer, int) (int, error)
-	Unmarshal(io.Reader, int) (int, error)
-}
-
-// SizeHinter defines an interface for types that can hint at the number of
-// bytes required to represent the type in its binary form. This is useful for
-// grouping memory allocations during marshaling/unmarshaling.
+// A SizeHinter can hint at the number of bytes required to represented it in
+// binary.
 type SizeHinter interface {
-	// SizeHint returns the recommended number of bytes that should be allocated
-	// when marshaling this type. It should return an upper bound of the
-	// estimated number of bytes, if the exact number is unknown.
+	// SizeHint returns the upper bound for the number of bytes required to
+	// represent this value in binary.
 	SizeHint() int
 }
 
-// Marshaler defines an interface for types that can be marshaled to binary.
-// Marshaler types must hint at their size before marshaling.
+// A Marshaler can marshal itself into bytes.
 type Marshaler interface {
 	SizeHinter
 
-	// Marshal into an I/O writer. It accepts a maximum capacity of bytes that
-	// can be allocated, and returns the remaining capacity. It should not
-	// allocate more bytes than the maximum capacity.
-	Marshal(w io.Writer, m int) (int, error)
+	// Marshal this value into bytes.
+	Marshal(buf []byte, rem int) ([]byte, int, error)
 }
 
-// Unmarshaler defines an interface for types that can be unmarshaled from
-// binary. Unmarshaler types must hint at their size after marshaling.
+// An Unmarshaler can unmarshal itself from bytes.
 type Unmarshaler interface {
-	SizeHinter
-
-	// Unmarshal from an I/O reader. It accepts a maximum capacity of bytes that
-	// can be allocated, and returns the remaining capacity. It must not
-	// allocate more bytes than the maximum capacity.
-	Unmarshal(r io.Reader, m int) (int, error)
+	// Unmarshal this value from bytes.
+	Unmarshal(buf []byte, rem int) ([]byte, int, error)
 }
 
-// ToBinary marshals a value into a byte slice. It allocates an in-memory
-// buffer, using SizeHint to estimate the initial size of the buffer (preventing
-// the need to grow the buffer while marshaling). This function is implemented
-// for all scalar types, arrays, slices, and maps. If the type implements the
-// Marshaler interface, then this function will use that implementation.
-//
-// An example of marshaling a scalar value:
-//
-//  x := 42
-//  data, err := surge.ToBinary(x)
-//  if err != nil {
-//      panic(err)
-//  }
-//  fmt.Printf("%x", data)
-//
-func ToBinary(v interface{}) ([]byte, error) {
-	buf := new(bytes.Buffer)
-	buf.Grow(SizeHint(v))
-	_, err := Marshal(buf, v, MaxBytes)
-	return buf.Bytes(), err
+// A MarshalUnmarshaler is a marshaler and an unmarshaler.
+type MarshalUnmarshaler interface {
+	Marshaler
+	Unmarshaler
 }
 
-// FromBinary unmarshals a byte slice into a pointer. This function is
-// implemented for all scalar types, arrays, slices, and maps. If the type
-// implements the Unmarshaler interface, then this function will use that
-// implementation. This function will never consume more memory than the default
-// MaxBytes.
+// SizeHint returns the number of bytes required to store a value in its binary
+// representation. This is the number of bytes "on the wire", not the number of
+// bytes that need to be allocated during marshaling/unmarshaling (which can be
+// different, depending on the representation of the value). SizeHint supports
+// all scalars, strings, arrays, slices, maps, structs, and custom
+// implementations (for types that implement the SizeHinter interface). If the
+// type is not supported, then zero is returned. If the value is a pointer, then
+// the size of the underlying value being pointed to will be returned.
 //
-// An example of marshaling/unmarshaling a map:
-//
-//  xs := map[string]string{}
-//  xs["foo1"] = "bar"
-//  xs["foo2"] = "baz"
-//
-//  data, err := surge.ToBinary(xs)
-//  if err != nil {
-//      panic(err)
+//  x := int64(0)
+//  sizeHint := surge.SizeHint(x)
+//  if sizeHint != 8 {
+//      panic("assertion failed: size of int64 must be 8 bytes")
 //  }
 //
-//  ys := map[string]string{}
-//  if err := surge.FromBinary(&ys, data); err != nil {
-//      panic(err)
-//  }
-//  fmt.Printf("foo1: %s\n", ys["foo1"])
-//  fmt.Printf("foo2: %s\n", ys["foo2"])
-//
-func FromBinary(data []byte, v interface{}) (err error) {
-	buf := bytes.NewBuffer(data)
-	_, err = Unmarshal(buf, v, MaxBytes)
-	return
-}
-
-// SizeHint returns an estimate of the number of bytes that will be produced
-// when marshaling a value. This is useful when pre-allocating memory to store
-// marshaled values.
 func SizeHint(v interface{}) int {
-	switch v := v.(type) {
-	case bool:
-		return 1
-	case *bool:
-		return 1
-	case []bool:
-		return 4 + len(v)
+	return sizeHintReflected(reflect.ValueOf(v))
+}
 
-	case int8:
-		return 1
-	case *int8:
-		return 1
-	case []int8:
-		return 4 + len(v)
+// Marshal a value into its binary representation, and store the value in a byte
+// slice. The "remaining memory quota" defines the maximum amount of bytes that
+// can be allocated on the heap when marshaling the value. In this way, the
+// remaining memory quota can be used to avoid allocating too much memory during
+// marshaling. Marshaling supports all scalars, strings, arrays, slices, maps,
+// structs, and custom implementations (for types that implement the Marshaler
+// interface). After marshaling, the unconsumed tail of the byte slice, and the
+// remaining memory quota, are returned. If the byte slice is too small, then an
+// error is returned. Similarly, if the remaining memory quote is too small,
+// then an error is returned. If the type is not supported, then an error is
+// returned. An error does not imply that nothing from the byte slice, or
+// remaining memory quota, was consumed. If the value is a pointer, then the
+// underlying value being pointed to will be marshaled.
+//
+//  x := int64(0)
+//  buf := make([]byte, 8)
+//  tail, rem, err := surge.Marshal(x, buf, 8)
+//  if len(tail) != 0 {
+//      panic("assertion failed: int64 must consume 8 bytes")
+//  }
+//  if rem != 0 {
+//      panic("assertion failed: int64 must consume 8 bytes of the memory quota")
+//  }
+//  if err != nil {
+//      panic(fmt.Errorf("assertion failed: %v", err))
+//  }
+//
+func Marshal(v interface{}, buf []byte, rem int) ([]byte, int, error) {
+	return marshalReflected(reflect.ValueOf(v), buf, rem)
+}
 
-	case int16:
-		return 2
-	case *int16:
-		return 2
-	case []int16:
-		return 4 + (len(v) << 1)
+// Unmarshal a value from its binary representation by reading from a byte
+// slice. The "remaining memory quota" defines the maximum amount of bytes that
+// can be allocated on the heap when unmarshaling the value. In this way, the
+// remaining memory quota can be used to avoid allocating too much memory during
+// unmarshaling (this is particularly useful when dealing with potentially
+// malicious input). Unmarshaling supports pointers to all scalars, strings,
+// arrays, slices, maps, structs, and custom implementations (for types that
+// implement the Unmarshaler interface). After unmarshaling, the unconsumed tail
+// of the byte slice, and the remaining memory quota, are returned. If the byte
+// slice is too small, then an error is returned. Similarly, if the remaining
+// memory quote is too small, then an error is returned. If the type is not a
+// pointer to one of the supported types, then an error is returned. An error
+// does not imply that nothing from the byte slice, or remaining memory quota,
+// was consumed. If the value is not a pointer, then an error is returned.
+//
+//  x := int64(0)
+//  buf := make([]byte, 8)
+//  tail, rem, err := surge.Unmarshal(&x, buf, 8)
+//  if len(tail) != 0 {
+//      panic("assertion failed: int64 must consume 8 bytes")
+//  }
+//  if rem != 0 {
+//      panic("assertion failed: int64 must consume 8 bytes of the memory quota")
+//  }
+//  if err != nil {
+//      panic(fmt.Errorf("assertion failed: %v", err))
+//  }
+//
+func Unmarshal(v interface{}, buf []byte, rem int) ([]byte, int, error) {
+	valueOf := reflect.ValueOf(v)
+	if valueOf.Kind() != reflect.Ptr {
+		return buf, rem, NewErrUnsupportedUnmarshalType(v)
+	}
+	return unmarshalReflected(valueOf, buf, rem)
+}
 
-	case int32:
-		return 4
-	case *int32:
-		return 4
-	case []int32:
-		return 4 + (len(v) << 2)
-
-	case int64:
-		return 8
-	case *int64:
-		return 8
-	case []int64:
-		return 4 + (len(v) << 3)
-
-	case uint8:
-		return 1
-	case *uint8:
-		return 1
-	case []uint8:
-		return 4 + len(v)
-
-	case uint16:
-		return 2
-	case *uint16:
-		return 2
-	case []*uint16:
-		return 4 + (len(v) << 1)
-
-	case uint32:
-		return 4
-	case *uint32:
-		return 4
-	case []*uint32:
-		return 4 + (len(v) << 2)
-
-	case uint64:
-		return 8
-	case *uint64:
-		return 8
-	case []uint64:
-		return 4 + (len(v) << 3)
+func sizeHintReflected(v reflect.Value) int {
+	if v.Type().Implements(sizeHinter) {
+		return v.Interface().(SizeHinter).SizeHint()
 	}
 
-	if interf, ok := v.(SizeHinter); ok {
-		return interf.SizeHint()
-	}
+	switch v.Kind() {
+	case reflect.Bool:
+		return SizeHintBool
 
-	valOf := reflect.ValueOf(v)
+	case reflect.Uint8:
+		return SizeHintU8
+	case reflect.Uint16:
+		return SizeHintU16
+	case reflect.Uint32:
+		return SizeHintU32
+	case reflect.Uint, reflect.Uint64:
+		return SizeHintU64
 
-	switch valOf.Type().Kind() {
+	case reflect.Int8:
+		return SizeHintI8
+	case reflect.Int16:
+		return SizeHintI16
+	case reflect.Int32:
+		return SizeHintI32
+	case reflect.Int64:
+		return SizeHintI64
+
+	case reflect.Float32:
+		return SizeHintF32
+	case reflect.Float64:
+		return SizeHintF64
+
 	case reflect.String:
-		return 4 + valOf.Len()
+		return SizeHintString(v.String())
 
-	case reflect.Bool, reflect.Int8, reflect.Uint8:
-		return 1
-
-	case reflect.Int16, reflect.Uint16:
-		return 2
-
-	case reflect.Int32, reflect.Uint32:
-		return 4
-
-	case reflect.Int64, reflect.Uint64:
-		return 8
-
-	case reflect.Array, reflect.Slice:
-		sizeHint := 4 // Size of length prefix
-		for i := 0; i < valOf.Len(); i++ {
-			sizeHint += SizeHint(valOf.Index(i).Interface())
-		}
-		return sizeHint
-
+	case reflect.Array:
+		return sizeHintReflectedArray(v)
+	case reflect.Slice:
+		return sizeHintReflectedSlice(v)
 	case reflect.Map:
-		sizeHint := 4 // Size of length prefix
-		for _, key := range valOf.MapKeys() {
-			sizeHint += SizeHint(key.Interface())
-			sizeHint += SizeHint(valOf.MapIndex(key).Interface())
+		return sizeHintReflectedMap(v)
+	case reflect.Struct:
+		return sizeHintReflectedStruct(v)
+	case reflect.Ptr:
+		v = reflect.Indirect(v)
+		if v.IsValid() {
+			return sizeHintReflected(v)
 		}
-		return sizeHint
-	}
-
-	if valOf.Type().Kind() == reflect.Ptr {
-		return SizeHint(reflect.Indirect(valOf).Interface())
+		return 0
 	}
 
 	return 0
 }
 
-// Marshal a value into an I/O writer. This is more efficient than marshaling a
-// value into a byte slice and returning the byte slice, because the I/O writer
-// can be pre-allocated with enough memory to avoid internal allocations and
-// buffer copies while marshaling.
-//
-// Marshaling attempts to restrict how many bytes can be allocation/written. It
-// accepts the maximum number of bytes that should be allocated/written, and
-// returns the number of bytes left (this can be negative).
-//
-// When marshaling scalars, all values are marshaled into bytes using big endian
-// encoding.
-//
-// When marshaling arrays/slices/maps, an uint32 length prefix is marshaled and
-// prefixed.
-//
-// When marshaling maps, key/value pairs are marshaled in order of the keys
-// (sorted after the key has been marshaled). This guarantees consistency; the
-// marshaled bytes are always the same if the key/values in the map are the
-// same. This is particularly useful when hashing.
-//
-// When marshaling a value that implements the Marshaler interface, it is up to
-// the user to guarantee that the implementation is sane.
-func Marshal(w io.Writer, v interface{}, m int) (int, error) {
-	if m <= 0 {
-		return m, ErrMaxBytesExceeded
+func marshalReflected(v reflect.Value, buf []byte, rem int) ([]byte, int, error) {
+	if v.Type().Implements(marshaler) {
+		return v.Interface().(Marshaler).Marshal(buf, rem)
 	}
 
-	// Marshal types that implement the Marshaler interface.
-	if interf, ok := v.(Marshaler); ok {
-		return interf.Marshal(w, m)
-	}
-
-	// Marshal byte slices.
-	if v, ok := v.([]byte); ok {
-		if m < 4+len(v) {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [4]byte{}
-		binary.BigEndian.PutUint32(bs[:], uint32(len(v)))
-		n1, err := w.Write(bs[:])
-		if err != nil {
-			return m - n1, err
-		}
-		n2, err := w.Write(v)
-		return m - n1 - n2, err
-	}
-
-	// Marshal pointers by flattening them.
-	valOf := reflect.ValueOf(v)
-	if valOf.Type().Kind() == reflect.Ptr {
-		return Marshal(w, reflect.Indirect(valOf).Interface(), m)
-	}
-
-	// Marshal by kind.
-	switch valOf.Kind() {
-	case reflect.String:
-		len := valOf.Len()
-		if m < 4+len {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [4]byte{}
-		binary.BigEndian.PutUint32(bs[:], uint32(len))
-		n1, err := w.Write(bs[:])
-		if err != nil {
-			return m - n1, err
-		}
-		n2, err := w.Write([]byte(valOf.String()))
-		return m - n1 - n2, err
-
+	switch v.Kind() {
 	case reflect.Bool:
-		if m < 1 {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [1]byte{0}
-		if valOf.Bool() {
-			bs[0] = 1
-		}
-		n, err := w.Write(bs[:])
-		return m - n, err
-
-	case reflect.Int8:
-		if m < 1 {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [1]byte{byte(valOf.Int())}
-		n, err := w.Write(bs[:])
-		return m - n, err
-
-	case reflect.Int16:
-		if m < 2 {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [2]byte{}
-		binary.BigEndian.PutUint16(bs[:], uint16(valOf.Int()))
-		n, err := w.Write(bs[:])
-		return m - n, err
-
-	case reflect.Int32:
-		if m < 4 {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [4]byte{}
-		binary.BigEndian.PutUint32(bs[:], uint32(valOf.Int()))
-		n, err := w.Write(bs[:])
-		return m - n, err
-
-	case reflect.Int64:
-		if m < 8 {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [8]byte{}
-		binary.BigEndian.PutUint64(bs[:], uint64(valOf.Int()))
-		n, err := w.Write(bs[:])
-		return m - n, err
+		return MarshalBool(v.Bool(), buf, len(buf))
 
 	case reflect.Uint8:
-		if m < 1 {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [1]byte{byte(valOf.Uint())}
-		n, err := w.Write(bs[:])
-		return m - n, err
-
+		return MarshalU8(uint8(v.Uint()), buf, rem)
 	case reflect.Uint16:
-		if m < 2 {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [2]byte{}
-		binary.BigEndian.PutUint16(bs[:], uint16(valOf.Uint()))
-		n, err := w.Write(bs[:])
-		return m - n, err
-
+		return MarshalU16(uint16(v.Uint()), buf, rem)
 	case reflect.Uint32:
-		if m < 4 {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [4]byte{}
-		binary.BigEndian.PutUint32(bs[:], uint32(valOf.Uint()))
-		n, err := w.Write(bs[:])
-		return m - n, err
-
-	case reflect.Uint64:
-		if m < 8 {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [8]byte{}
-		binary.BigEndian.PutUint64(bs[:], uint64(valOf.Uint()))
-		n, err := w.Write(bs[:])
-		return m - n, err
-
-	case reflect.Array:
-		err := error(nil)
-		len := valOf.Len()
-		for i := 0; i < len; i++ {
-			m, err = Marshal(w, valOf.Index(i).Interface(), m)
-			if err != nil {
-				return m, err
-			}
-		}
-		return m, nil
-
-	case reflect.Slice:
-		len := valOf.Len()
-		m, err := Marshal(w, uint32(len), m)
-		if err != nil {
-			return m, err
-		}
-		for i := 0; i < len; i++ {
-			m, err = Marshal(w, valOf.Index(i).Interface(), m)
-			if err != nil {
-				return m, err
-			}
-		}
-		return m, nil
-
-	case reflect.Map:
-		err := error(nil)
-		len := valOf.Len()
-
-		// Sort the keys in the map, using the marshaled byte representations as
-		// strings for comparison.
-		marshaledKeys := make([]string, len)
-		marshaledKeysToValue := make(map[string]reflect.Value, len)
-		buf := new(bytes.Buffer)
-		for i, key := range valOf.MapKeys() {
-			// We consider the degradation of m here, so we should not consider
-			// it in the next step when we write the keys to the I/O writer
-			// proper.
-			m, err = Marshal(buf, key.Interface(), m)
-			if err != nil {
-				return m, err
-			}
-			marshaledKey := string(buf.Bytes())
-			marshaledKeys[i] = marshaledKey
-			marshaledKeysToValue[marshaledKey] = valOf.MapIndex(key)
-			buf.Reset()
-		}
-		sort.Strings(marshaledKeys)
-
-		// Marshal the map into the writer, iterating through the sorted keys in
-		// order.
-		m, err := Marshal(w, uint32(len), m)
-		if err != nil {
-			return m, err
-		}
-		for _, marshaledKey := range marshaledKeys {
-			// Write the key, but do not subtract the bytes written from m. We
-			// have already done this in the previous step.
-			_, err = w.Write([]byte(marshaledKey))
-			if err != nil {
-				return m, err
-			}
-			// Write value
-			m, err = Marshal(w, marshaledKeysToValue[marshaledKey].Interface(), m)
-			if err != nil {
-				return m, err
-			}
-		}
-		return m, nil
-	}
-
-	return m, newErrUnsupportedMarshalType(v)
-}
-
-// Unmarshal from an I/O reader into a pointer. This function is a complement to
-// marshaling. Unmarshaling will never allocate more bytes than the given
-// maximum, preventing malicious input from causing OOM errors.
-func Unmarshal(r io.Reader, v interface{}, m int) (int, error) {
-	if m <= 0 {
-		return m, ErrMaxBytesExceeded
-	}
-
-	// Unmarshal types that implement the Unmarshaler interface.
-	if interf, ok := v.(Unmarshaler); ok {
-		return interf.Unmarshal(r, m)
-	}
-
-	// Unmarshal byte slices.
-	if v, ok := v.(*[]byte); ok {
-		// Read length of bytes
-		if m < 4 {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [4]byte{}
-		n, err := io.ReadFull(r, bs[:])
-		if err != nil {
-			return m - n, err
-		}
-		m -= 4
-		len := binary.BigEndian.Uint32(bs[:])
-		// Check length
-		if int(len) < 0 {
-			return m, ErrLengthOverflow
-		}
-		m -= int(len)
-		if m <= 0 {
-			return m, ErrMaxBytesExceeded
-		}
-		// Read bytes
-		*v = make([]byte, len)
-		_, err = io.ReadFull(r, *v)
-		return m, err
-	}
-
-	// Check that we are unmarshaling into a pointer.
-	valOf := reflect.ValueOf(v)
-	if valOf.Type().Kind() != reflect.Ptr {
-		return m, newErrUnsupportedUnmarshalType(v)
-	}
-
-	// Unmarshal by kind.
-	switch valOf := reflect.Indirect(valOf); valOf.Kind() {
-	case reflect.String:
-		// Read length of string
-		if m < 4 {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [4]byte{}
-		n, err := io.ReadFull(r, bs[:])
-		if err != nil {
-			return m - n, err
-		}
-		m -= 4
-		len := binary.BigEndian.Uint32(bs[:])
-		// Check length
-		if int(len) < 0 {
-			return m, ErrLengthOverflow
-		}
-		m -= int(len)
-		if m <= 0 {
-			return m, ErrMaxBytesExceeded
-		}
-		// Read bytes
-		data := make([]byte, len)
-		_, err = io.ReadFull(r, data)
-		if err != nil {
-			return m, err
-		}
-		// Read string
-		valOf.SetString(string(data))
-		return m, nil
-
-	case reflect.Bool:
-		if m < 1 {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [1]byte{}
-		n, err := io.ReadFull(r, bs[:])
-		if err != nil {
-			return m - n, err
-		}
-		valOf.SetBool(bs[0] != 0)
-		return m - n, nil
+		return MarshalU32(uint32(v.Uint()), buf, rem)
+	case reflect.Uint, reflect.Uint64:
+		return MarshalU64(uint64(v.Uint()), buf, rem)
 
 	case reflect.Int8:
-		if m < 1 {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [1]byte{}
-		n, err := io.ReadFull(r, bs[:])
-		if err != nil {
-			return m - n, err
-		}
-		valOf.SetInt(int64(bs[0]))
-		return m - n, nil
-
+		return MarshalI8(int8(v.Int()), buf, rem)
 	case reflect.Int16:
-		if m < 2 {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [2]byte{}
-		n, err := io.ReadFull(r, bs[:])
-		if err != nil {
-			return m - n, err
-		}
-		valOf.SetInt(int64(binary.BigEndian.Uint16(bs[:])))
-		return m - n, nil
-
+		return MarshalI16(int16(v.Int()), buf, rem)
 	case reflect.Int32:
-		if m < 4 {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [4]byte{}
-		n, err := io.ReadFull(r, bs[:])
-		if err != nil {
-			return m - n, err
-		}
-		valOf.SetInt(int64(binary.BigEndian.Uint32(bs[:])))
-		return m - n, nil
-
+		return MarshalI32(int32(v.Int()), buf, rem)
 	case reflect.Int64:
-		if m < 8 {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [8]byte{}
-		n, err := io.ReadFull(r, bs[:])
-		if err != nil {
-			return m - n, err
-		}
-		valOf.SetInt(int64(binary.BigEndian.Uint64(bs[:])))
-		return m - n, nil
+		return MarshalI64(int64(v.Int()), buf, rem)
 
-	case reflect.Uint8:
-		if m < 1 {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [1]byte{}
-		n, err := io.ReadFull(r, bs[:])
-		if err != nil {
-			return m - n, err
-		}
-		valOf.SetUint(uint64(bs[0]))
-		return m - n, nil
+	case reflect.Float32:
+		return MarshalF32(float32(v.Float()), buf, rem)
+	case reflect.Float64:
+		return MarshalF64(float64(v.Float()), buf, rem)
 
-	case reflect.Uint16:
-		if m < 2 {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [2]byte{}
-		n, err := io.ReadFull(r, bs[:])
-		if err != nil {
-			return m - n, err
-		}
-		valOf.SetUint(uint64(binary.BigEndian.Uint16(bs[:])))
-		return m - n, nil
-
-	case reflect.Uint32:
-		if m < 4 {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [4]byte{}
-		n, err := io.ReadFull(r, bs[:])
-		if err != nil {
-			return m - n, err
-		}
-		valOf.SetUint(uint64(binary.BigEndian.Uint32(bs[:])))
-		return m - n, nil
-
-	case reflect.Uint64:
-		if m < 8 {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [8]byte{}
-		n, err := io.ReadFull(r, bs[:])
-		if err != nil {
-			return m - n, err
-		}
-		valOf.SetUint(uint64(binary.BigEndian.Uint64(bs[:])))
-		return m - n, nil
+	case reflect.String:
+		return MarshalString(v.String(), buf, rem)
 
 	case reflect.Array:
-		// Read array elements
-		err := error(nil)
-		len := valOf.Len()
-		for i := 0; i < len; i++ {
-			m, err = Unmarshal(r, valOf.Index(i).Addr().Interface(), m)
-			if err != nil {
-				return m, err
-			}
-		}
-		return m, nil
-
+		return marshalReflectedArray(v, buf, rem)
 	case reflect.Slice:
-		// Read length of slice
-		if m < 4 {
-			return m, ErrMaxBytesExceeded
-		}
-		bs := [4]byte{}
-		n, err := io.ReadFull(r, bs[:])
-		if err != nil {
-			return m - n, err
-		}
-		m -= 4
-		len := binary.BigEndian.Uint32(bs[:])
-		// Check length
-		if int(len) < 0 {
-			return m, ErrLengthOverflow
-		}
-
-		// Scale length by the SizeHint of the element. This is because each
-		// element in a list is not going to be a single byte. A similar this
-		// needs to be done for maps.
-		size := uint32(valOf.Type().Size())
-		if uint64(len)*uint64(size) > uint64(m) {
-			return m, ErrMaxBytesExceeded
-		}
-		if int(len*size) < 0 {
-			return m, ErrLengthOverflow
-		}
-		m -= int(len * size)
-
-		// Read slice
-		valOf.Set(reflect.MakeSlice(valOf.Type(), int(len), int(len)))
-		for i := 0; i < int(len); i++ {
-			if v, ok := valOf.Index(i).Interface().(Unmarshaler); ok {
-				m, err = v.Unmarshal(r, m)
-			} else {
-				m, err = Unmarshal(r, valOf.Index(i).Addr().Interface(), m)
-			}
-			if err != nil {
-				return m, err
-			}
-		}
-		return m, nil
-
+		return marshalReflectedSlice(v, buf, rem)
 	case reflect.Map:
-		// Read length of map
-		if m < 4 {
-			return m, ErrMaxBytesExceeded
+		return marshalReflectedMap(v, buf, rem)
+	case reflect.Struct:
+		return marshalReflectedStruct(v, buf, rem)
+	case reflect.Ptr:
+		v = reflect.Indirect(v)
+		if v.IsValid() {
+			return marshalReflected(v, buf, rem)
 		}
-		bs := [4]byte{}
-		n, err := io.ReadFull(r, bs[:])
-		if err != nil {
-			return m - n, err
-		}
-		m -= 4
-		len := binary.BigEndian.Uint32(bs[:])
-		// Check length
-		if int(len) < 0 {
-			return m, ErrLengthOverflow
-		}
-
-		// Scale length by the SizeHint of the element. This is because each
-		// element in a list is not going to be a single byte. A similar this
-		// needs to be done for maps.
-		size := uint32(valOf.Type().Key().Size() + valOf.Type().Elem().Size())
-		if uint64(len)*uint64(size) > uint64(m) {
-			return m, ErrMaxBytesExceeded
-		}
-		if int(len*size) < 0 {
-			return m, ErrLengthOverflow
-		}
-		m -= int(len * size)
-
-		// Read map
-		valOf.Set(reflect.MakeMapWithSize(valOf.Type(), int(len)))
-		key := reflect.New(valOf.Type().Key())
-		elem := reflect.New(valOf.Type().Elem())
-		for i := 0; i < int(len); i++ {
-			// Read key
-			m, err = Unmarshal(r, key.Interface(), m)
-			if err != nil {
-				return m, err
-			}
-			// Read elem
-			m, err = Unmarshal(r, elem.Interface(), m)
-			if err != nil {
-				return m, err
-			}
-			// Insert into map
-			valOf.SetMapIndex(reflect.Indirect(key), reflect.Indirect(elem))
-		}
-		return m, nil
+		return buf, rem, nil
 	}
 
-	return m, newErrUnsupportedUnmarshalType(v)
+	return buf, rem, NewErrUnsupportedMarshalType(v.Interface())
 }
+
+func unmarshalReflected(v reflect.Value, buf []byte, rem int) ([]byte, int, error) {
+	if v.Type().Implements(unmarshaler) {
+		return v.Interface().(Unmarshaler).Unmarshal(buf, rem)
+	}
+
+	switch v.Type().Elem().Kind() {
+	case reflect.Uint8:
+		return UnmarshalU8((*uint8)(unsafe.Pointer(v.Pointer())), buf, rem)
+	case reflect.Uint16:
+		return UnmarshalU16((*uint16)(unsafe.Pointer(v.Pointer())), buf, rem)
+	case reflect.Uint32:
+		return UnmarshalU32((*uint32)(unsafe.Pointer(v.Pointer())), buf, rem)
+	case reflect.Uint64:
+		return UnmarshalU64((*uint64)(unsafe.Pointer(v.Pointer())), buf, rem)
+
+	case reflect.Int8:
+		return UnmarshalI8((*int8)(unsafe.Pointer(v.Pointer())), buf, rem)
+	case reflect.Int16:
+		return UnmarshalI16((*int16)(unsafe.Pointer(v.Pointer())), buf, rem)
+	case reflect.Int32:
+		return UnmarshalI32((*int32)(unsafe.Pointer(v.Pointer())), buf, rem)
+	case reflect.Int64:
+		return UnmarshalI64((*int64)(unsafe.Pointer(v.Pointer())), buf, rem)
+
+	case reflect.Float32:
+		return UnmarshalF32((*float32)(unsafe.Pointer(v.Pointer())), buf, rem)
+	case reflect.Float64:
+		return UnmarshalF64((*float64)(unsafe.Pointer(v.Pointer())), buf, rem)
+
+	case reflect.String:
+		return UnmarshalString((*string)(unsafe.Pointer(v.Pointer())), buf, rem)
+
+	case reflect.Array:
+		return unmarshalReflectedArray(v, buf, rem)
+	case reflect.Slice:
+		return unmarshalReflectedSlice(v, buf, rem)
+	case reflect.Map:
+		return unmarshalReflectedMap(v, buf, rem)
+	case reflect.Struct:
+		return unmarshalReflectedStruct(v, buf, rem)
+	}
+
+	return buf, rem, NewErrUnsupportedUnmarshalType(v.Interface())
+}
+
+var (
+	sizeHinter  = reflect.ValueOf((*SizeHinter)(nil)).Type().Elem()
+	marshaler   = reflect.ValueOf((*Marshaler)(nil)).Type().Elem()
+	unmarshaler = reflect.ValueOf((*Unmarshaler)(nil)).Type().Elem()
+)
