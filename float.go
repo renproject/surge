@@ -24,7 +24,7 @@ func MarshalF32(x float32, buf []byte, rem int) ([]byte, int, error) {
 		return buf, rem, ErrUnexpectedEndOfBuffer
 	}
 	binary.BigEndian.PutUint32(buf, math.Float32bits(x))
-	return buf[SizeHintI32:], rem - SizeHintF32, nil
+	return buf[SizeHintF32:], rem - SizeHintF32, nil
 }
 
 // MarshalF64 into a byte slice. It will not consume more memory than the
