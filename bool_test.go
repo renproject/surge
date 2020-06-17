@@ -95,23 +95,21 @@ var _ = Describe("Boolean", func() {
 
 		Context("when the buffer is big enough", func() {
 			Context("when there are sufficient remaining bytes", func() {
-				It("should not return an error", func() {
+				It("should return the original value", func() {
 					r := rand.New(rand.NewSource(time.Now().UnixNano()))
-					f := func(buf [100]byte) bool {
+					f := func(x bool) bool {
 						excess := r.Int() % 100
 						rem := surge.SizeHintBool + excess
+						buf := make([]byte, surge.SizeHintBool)
+						_, _, err := surge.Marshal(x, buf, rem)
 
-						x := false
-						tail, tailRem, err := surge.UnmarshalBool(&x, buf[:], rem)
+						y := false
+						tail, tailRem, err := surge.UnmarshalBool(&y, buf[:], rem)
 						Expect(tail).To(HaveLen(len(buf) - surge.SizeHintBool))
 						Expect(tailRem).To(Equal(excess))
 						Expect(err).ToNot(HaveOccurred())
 
-						if buf[0] == 0 {
-							Expect(x).To(BeFalse())
-						} else {
-							Expect(x).To(BeTrue())
-						}
+						Expect(x).To(Equal(y))
 						return true
 					}
 					Expect(quick.Check(f, nil)).To(Succeed())

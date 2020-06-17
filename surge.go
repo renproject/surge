@@ -154,12 +154,13 @@ func sizeHintReflected(v reflect.Value) int {
 	case reflect.Float64:
 		return SizeHintF64
 
+	case reflect.String:
+		return SizeHintString(v.String())
+
 	case reflect.Array:
 		return sizeHintReflectedArray(v)
 	case reflect.Slice:
 		return sizeHintReflectedSlice(v)
-	case reflect.String:
-		return sizeHintReflectedString(v)
 	case reflect.Map:
 		return sizeHintReflectedMap(v)
 	case reflect.Struct:
@@ -207,12 +208,13 @@ func marshalReflected(v reflect.Value, buf []byte, rem int) ([]byte, int, error)
 	case reflect.Float64:
 		return MarshalF64(float64(v.Float()), buf, rem)
 
+	case reflect.String:
+		return MarshalString(v.String(), buf, rem)
+
 	case reflect.Array:
 		return marshalReflectedArray(v, buf, rem)
 	case reflect.Slice:
 		return marshalReflectedSlice(v, buf, rem)
-	case reflect.String:
-		return marshalReflectedString(v, buf, rem)
 	case reflect.Map:
 		return marshalReflectedMap(v, buf, rem)
 	case reflect.Struct:
@@ -257,12 +259,13 @@ func unmarshalReflected(v reflect.Value, buf []byte, rem int) ([]byte, int, erro
 	case reflect.Float64:
 		return UnmarshalF64((*float64)(unsafe.Pointer(v.Pointer())), buf, rem)
 
+	case reflect.String:
+		return UnmarshalString((*string)(unsafe.Pointer(v.Pointer())), buf, rem)
+
 	case reflect.Array:
 		return unmarshalReflectedArray(v, buf, rem)
 	case reflect.Slice:
 		return unmarshalReflectedSlice(v, buf, rem)
-	case reflect.String:
-		return unmarshalReflectedString(v, buf, rem)
 	case reflect.Map:
 		return unmarshalReflectedMap(v, buf, rem)
 	case reflect.Struct:
