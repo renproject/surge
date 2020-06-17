@@ -72,7 +72,7 @@ func Marshal(v interface{}, buf []byte, rem int) ([]byte, int, error) {
 func Unmarshal(v interface{}, buf []byte, rem int) ([]byte, int, error) {
 	valueOf := reflect.ValueOf(v)
 	if valueOf.Kind() != reflect.Ptr {
-		return buf, rem, newErrUnsupportedUnmarshalType(v)
+		return buf, rem, NewErrUnsupportedUnmarshalType(v)
 	}
 	return unmarshalReflected(valueOf, buf, rem)
 }
@@ -101,7 +101,7 @@ func sizeHintReflected(v reflect.Value) int {
 		return SizeHintI16
 	case reflect.Int32:
 		return SizeHintI32
-	case reflect.Int, reflect.Int64:
+	case reflect.Int64:
 		return SizeHintI64
 
 	case reflect.Float32:
@@ -154,7 +154,7 @@ func marshalReflected(v reflect.Value, buf []byte, rem int) ([]byte, int, error)
 		return MarshalI16(int16(v.Int()), buf, rem)
 	case reflect.Int32:
 		return MarshalI32(int32(v.Int()), buf, rem)
-	case reflect.Int, reflect.Int64:
+	case reflect.Int64:
 		return MarshalI64(int64(v.Int()), buf, rem)
 
 	case reflect.Float32:
@@ -180,7 +180,7 @@ func marshalReflected(v reflect.Value, buf []byte, rem int) ([]byte, int, error)
 		return buf, rem, nil
 	}
 
-	return buf, rem, newErrUnsupportedMarshalType(v.Interface())
+	return buf, rem, NewErrUnsupportedMarshalType(v.Interface())
 }
 
 func unmarshalReflected(v reflect.Value, buf []byte, rem int) ([]byte, int, error) {
@@ -224,7 +224,7 @@ func unmarshalReflected(v reflect.Value, buf []byte, rem int) ([]byte, int, erro
 		return unmarshalReflectedStruct(v, buf, rem)
 	}
 
-	return buf, rem, newErrUnsupportedUnmarshalType(v.Interface())
+	return buf, rem, NewErrUnsupportedUnmarshalType(v.Interface())
 }
 
 var (

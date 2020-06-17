@@ -94,7 +94,7 @@ var _ = Describe("Struct", func() {
 
 		Context("when the buffer is big enough", func() {
 			Context("when there are sufficient remaining bytes", func() {
-				It("should return the original struct", func() {
+				It("should return the original value", func() {
 					r := rand.New(rand.NewSource(time.Now().UnixNano()))
 					f := func(name string, age uint64) bool {
 						x := Person{Name: name, Age: age}

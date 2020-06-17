@@ -19,7 +19,7 @@ type ErrUnsupportedMarshalType struct {
 	error
 }
 
-func newErrUnsupportedMarshalType(v interface{}) error {
+func NewErrUnsupportedMarshalType(v interface{}) error {
 	return ErrUnsupportedMarshalType{error: fmt.Errorf("marshal error: unsupported type %T", v)}
 }
 
@@ -29,6 +29,6 @@ type ErrUnsupportedUnmarshalType struct {
 	error
 }
 
-func newErrUnsupportedUnmarshalType(v interface{}) error {
+func NewErrUnsupportedUnmarshalType(v interface{}) error {
 	return ErrUnsupportedUnmarshalType{error: fmt.Errorf("unmarshal error: unsupported type %T", v)}
 }

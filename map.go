@@ -3,6 +3,7 @@ package surge
 import (
 	"reflect"
 	"sort"
+	"unsafe"
 )
 
 func sizeHintReflectedMap(v reflect.Value) int {
@@ -34,7 +35,10 @@ func marshalReflectedMap(v reflect.Value, buf []byte, rem int) ([]byte, int, err
 	// Allocate a slice for storing the key/value pairs. This is needed so that
 	// we can then sort the slice, ensuring that the key/value ordering is
 	// deterministic.
-	n := v.Len() * int(v.Type().Elem().Size())
+	n := v.Len() * int(unsafe.Sizeof(KeyValue{}))
+	if n < 0 {
+		return buf, rem, ErrLengthOverflow
+	}
 	if rem < n {
 		return buf, rem, ErrUnexpectedEndOfBuffer
 	}
@@ -53,7 +57,7 @@ func marshalReflectedMap(v reflect.Value, buf []byte, rem int) ([]byte, int, err
 			keyData: make([]byte, sizeHint),
 			key:     key,
 		}
-		if _, rem, err = marshalReflected(key, keyValue.keyData, rem); err != nil {
+		if _, rem, err = marshalReflected(key, keyValue.keyData, rem+sizeHint); err != nil {
 			return buf, rem, err
 		}
 
@@ -103,9 +107,10 @@ func marshalReflectedMap(v reflect.Value, buf []byte, rem int) ([]byte, int, err
 }
 
 func unmarshalReflectedMap(v reflect.Value, buf []byte, rem int) ([]byte, int, error) {
+	var err error
+
 	mapLen := uint16(0)
-	buf, rem, err := UnmarshalU16(&mapLen, buf, rem)
-	if err != nil {
+	if buf, rem, err = UnmarshalU16(&mapLen, buf, rem); err != nil {
 		return buf, rem, err
 	}
 
@@ -114,26 +119,23 @@ func unmarshalReflectedMap(v reflect.Value, buf []byte, rem int) ([]byte, int, e
 	if n < 0 {
 		return buf, rem, ErrLengthOverflow
 	}
-	n *= int(elem.Type().Key().Size() + elem.Type().Elem().Size())
-	if n < 0 {
-		return buf, rem, ErrLengthOverflow
-	}
-	if rem < n {
+	size := int(elem.Type().Size())
+	if rem < size || size < 0 {
 		return buf, rem, ErrUnexpectedEndOfBuffer
 	}
-	rem -= n
+	rem -= size
 	elem.Set(reflect.MakeMapWithSize(elem.Type(), int(mapLen)))
 
 	for i := uint16(0); i < mapLen; i++ {
-		key := reflect.New(elem.Type().Key())
-		elem := reflect.New(elem.Type().Elem())
-		if buf, rem, err = unmarshalReflected(key, buf, rem); err != nil {
+		k := reflect.New(elem.Type().Key())
+		v := reflect.New(elem.Type().Elem())
+		if buf, rem, err = unmarshalReflected(k, buf, rem); err != nil {
 			return buf, rem, err
 		}
-		if buf, rem, err = unmarshalReflected(elem, buf, rem); err != nil {
+		if buf, rem, err = unmarshalReflected(v, buf, rem); err != nil {
 			return buf, rem, err
 		}
-		elem.SetMapIndex(reflect.Indirect(key), reflect.Indirect(elem))
+		elem.SetMapIndex(reflect.Indirect(k), reflect.Indirect(v))
 	}
 	return buf, rem, nil
 }
