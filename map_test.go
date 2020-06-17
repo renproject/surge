@@ -117,15 +117,14 @@ var _ = Describe("Map", func() {
 		Context("when the buffer is big enough", func() {
 			Context("when there are sufficient remaining bytes", func() {
 				It("should return the original value", func() {
-					r := rand.New(rand.NewSource(time.Now().UnixNano()))
 					f := func(x map[int8][100]int64) bool {
-						excess := r.Int() % 100
-						rem := surge.SizeHint(x) + 48*len(x) + excess
+						rem := surge.SizeHint(x) + 48*len(x)
 						buf := make([]byte, rem)
 						_, _, err := surge.Marshal(x, buf, rem)
 						Expect(err).ToNot(HaveOccurred())
 
 						y := map[int8][100]int64{}
+						rem = surge.SizeHint(x) + int(unsafe.Sizeof(x))
 						tail, tailRem, err := surge.Unmarshal(&y, buf[:], rem)
 						Expect(tail).To(HaveLen(len(buf) - surge.SizeHint(x)))
 						Expect(tailRem).To(BeNumerically("<=", rem))
