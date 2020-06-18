@@ -9,12 +9,12 @@ func SizeHintBytes(v []byte) int {
 }
 
 func MarshalBytes(v []byte, buf []byte, rem int) ([]byte, int, error) {
-	if len(buf) < SizeHintBytes(v) || rem < SizeHintBytes(v) {
-		return buf, rem, ErrUnexpectedEndOfBuffer
-	}
 	buf, rem, err := MarshalU16(uint16(len(v)), buf, rem)
 	if err != nil {
 		return buf, rem, err
+	}
+	if len(buf) < len(v) || rem < len(v) {
+		return buf, rem, ErrUnexpectedEndOfBuffer
 	}
 	copy(buf, v)
 	buf = buf[len(v):]
@@ -30,7 +30,7 @@ func UnmarshalBytes(v *[]byte, buf []byte, rem int) ([]byte, int, error) {
 	}
 
 	if len(buf) < int(vLen) || rem < int(vLen) {
-		return buf, rem, err
+		return buf, rem, ErrUnexpectedEndOfBuffer
 	}
 	*v = make([]byte, vLen)
 	copy(*v, buf)
@@ -69,11 +69,7 @@ func unmarshalReflectedSlice(v reflect.Value, buf []byte, rem int) ([]byte, int,
 	}
 
 	elem := v.Elem()
-	n := int(sliceLen)
-	if n < 0 {
-		return buf, rem, ErrLengthOverflow
-	}
-	n *= int(elem.Type().Elem().Size())
+	n := int(sliceLen) * int(elem.Type().Elem().Size())
 	if n < 0 {
 		return buf, rem, ErrLengthOverflow
 	}

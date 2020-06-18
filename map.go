@@ -115,24 +115,23 @@ func unmarshalReflectedMap(v reflect.Value, buf []byte, rem int) ([]byte, int, e
 	}
 
 	elem := v.Elem()
-	n := int(mapLen)
+	n := int(mapLen) * int(elem.Type().Key().Size()+elem.Type().Elem().Size())
 	if n < 0 {
 		return buf, rem, ErrLengthOverflow
 	}
-	size := int(elem.Type().Size())
-	if rem < size || size < 0 {
+	if rem < n {
 		return buf, rem, ErrUnexpectedEndOfBuffer
 	}
-	rem -= size
+	rem -= n
 	elem.Set(reflect.MakeMapWithSize(elem.Type(), int(mapLen)))
 
 	for i := uint16(0); i < mapLen; i++ {
 		k := reflect.New(elem.Type().Key())
 		v := reflect.New(elem.Type().Elem())
-		if buf, rem, err = unmarshalReflected(k, buf, rem); err != nil {
+		if buf, rem, err = unmarshalReflected(k, buf, rem); err != nil {	
 			return buf, rem, err
 		}
-		if buf, rem, err = unmarshalReflected(v, buf, rem); err != nil {
+		if buf, rem, err = unmarshalReflected(v, buf, rem); err != nil {	
 			return buf, rem, err
 		}
 		elem.SetMapIndex(reflect.Indirect(k), reflect.Indirect(v))

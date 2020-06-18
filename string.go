@@ -27,9 +27,6 @@ func UnmarshalString(v *string, buf []byte, rem int) ([]byte, int, error) {
 		return buf, rem, err
 	}
 	n := int(strLen)
-	if n < 0 {
-		return buf, rem, ErrLengthOverflow
-	}
 	if len(buf) < n || rem < n {
 		return buf, rem, ErrUnexpectedEndOfBuffer
 	}

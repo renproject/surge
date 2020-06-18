@@ -177,6 +177,9 @@ func sizeHintReflected(v reflect.Value) int {
 	case reflect.Array:
 		return sizeHintReflectedArray(v)
 	case reflect.Slice:
+		if v, ok := v.Interface().([]byte); ok {
+			return SizeHintBytes(v)
+		}
 		return sizeHintReflectedSlice(v)
 	case reflect.Map:
 		return sizeHintReflectedMap(v)
@@ -200,7 +203,7 @@ func marshalReflected(v reflect.Value, buf []byte, rem int) ([]byte, int, error)
 
 	switch v.Kind() {
 	case reflect.Bool:
-		return MarshalBool(v.Bool(), buf, len(buf))
+		return MarshalBool(v.Bool(), buf, rem)
 
 	case reflect.Uint8:
 		return MarshalU8(uint8(v.Uint()), buf, rem)
@@ -231,6 +234,9 @@ func marshalReflected(v reflect.Value, buf []byte, rem int) ([]byte, int, error)
 	case reflect.Array:
 		return marshalReflectedArray(v, buf, rem)
 	case reflect.Slice:
+		if v, ok := v.Interface().([]byte); ok {
+			return MarshalBytes(v, buf, rem)
+		}
 		return marshalReflectedSlice(v, buf, rem)
 	case reflect.Map:
 		return marshalReflectedMap(v, buf, rem)
@@ -253,6 +259,9 @@ func unmarshalReflected(v reflect.Value, buf []byte, rem int) ([]byte, int, erro
 	}
 
 	switch v.Type().Elem().Kind() {
+	case reflect.Bool:
+		return UnmarshalBool((*bool)(unsafe.Pointer(v.Pointer())), buf, rem)
+
 	case reflect.Uint8:
 		return UnmarshalU8((*uint8)(unsafe.Pointer(v.Pointer())), buf, rem)
 	case reflect.Uint16:
@@ -282,6 +291,9 @@ func unmarshalReflected(v reflect.Value, buf []byte, rem int) ([]byte, int, erro
 	case reflect.Array:
 		return unmarshalReflectedArray(v, buf, rem)
 	case reflect.Slice:
+		if v, ok := v.Interface().(*[]byte); ok {
+			return UnmarshalBytes(v, buf, rem)
+		}
 		return unmarshalReflectedSlice(v, buf, rem)
 	case reflect.Map:
 		return unmarshalReflectedMap(v, buf, rem)
