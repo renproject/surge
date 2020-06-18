@@ -4,6 +4,42 @@ import (
 	"reflect"
 )
 
+func SizeHintBytes(v []byte) int {
+	return 2 + len(v)
+}
+
+func MarshalBytes(v []byte, buf []byte, rem int) ([]byte, int, error) {
+	if len(buf) < SizeHintBytes(v) || rem < SizeHintBytes(v) {
+		return buf, rem, ErrUnexpectedEndOfBuffer
+	}
+	buf, rem, err := MarshalU16(uint16(len(v)), buf, rem)
+	if err != nil {
+		return buf, rem, err
+	}
+	copy(buf, v)
+	buf = buf[len(v):]
+	rem -= len(v)
+	return buf, rem, nil
+}
+
+func UnmarshalBytes(v *[]byte, buf []byte, rem int) ([]byte, int, error) {
+	vLen := uint16(0)
+	buf, rem, err := UnmarshalU16(&vLen, buf, rem)
+	if err != nil {
+		return buf, rem, err
+	}
+
+	if len(buf) < int(vLen) || rem < int(vLen) {
+		return buf, rem, err
+	}
+	*v = make([]byte, vLen)
+	copy(*v, buf)
+	buf = buf[vLen:]
+	rem -= int(vLen)
+
+	return buf, rem, nil
+}
+
 func sizeHintReflectedSlice(v reflect.Value) int {
 	sizeHint := 2
 	for i := 0; i < v.Len(); i++ {
