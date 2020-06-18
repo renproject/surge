@@ -36,6 +36,23 @@ type MarshalUnmarshaler interface {
 	Unmarshaler
 }
 
+// ToBinary returns the byte representation of a value. In uses the maximum
+// memory quota to restrict the number of bytes that will be allocated during
+// marshaling.
+func ToBinary(v interface{}) ([]byte, error) {
+	buf := make([]byte, SizeHint(v))
+	_, _, err := Marshal(v, buf, MaxBytes)
+	return buf, err
+}
+
+// FromBinary unmarshals a byte representation of a value to a pointer to that
+// value. In uses the maximum memory quota to restrict the number of bytes that
+// will be allocated during unmarshaling.
+func FromBinary(v interface{}, buf []byte) error {
+	_, _, err := Unmarshal(v, buf, MaxBytes)
+	return err
+}
+
 // SizeHint returns the number of bytes required to store a value in its binary
 // representation. This is the number of bytes "on the wire", not the number of
 // bytes that need to be allocated during marshaling/unmarshaling (which can be
