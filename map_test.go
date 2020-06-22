@@ -6,6 +6,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/renproject/surge/surgeutil"
 )
 
 var _ = Describe("Map", func() {
@@ -45,7 +46,7 @@ var _ = Describe("Map", func() {
 		Context(fmt.Sprintf("when marshaling and then unmarshaling %v maps", t), func() {
 			It("should return itself", func() {
 				for trial := 0; trial < numTrials; trial++ {
-					Expect(MarshalUnmarshalCheck(t)).To(Succeed())
+					Expect(surgeutil.MarshalUnmarshalCheck(t)).To(Succeed())
 				}
 			})
 		})
@@ -53,7 +54,7 @@ var _ = Describe("Map", func() {
 		Context(fmt.Sprintf("when fuzzing %v maps", t), func() {
 			It("should not panic", func() {
 				for trial := 0; trial < numTrials; trial++ {
-					Expect(func() { FuzzCheck(t) }).ToNot(Panic())
+					Expect(func() { surgeutil.Fuzz(t) }).ToNot(Panic())
 				}
 			})
 		})
@@ -62,7 +63,7 @@ var _ = Describe("Map", func() {
 			Context("when the buffer is too small", func() {
 				It("should return itself", func() {
 					for trial := 0; trial < numTrials; trial++ {
-						Expect(MarshalBufTooSmall(t)).To(Succeed())
+						Expect(surgeutil.MarshalBufTooSmall(t)).To(Succeed())
 					}
 				})
 			})
@@ -70,7 +71,7 @@ var _ = Describe("Map", func() {
 			Context("when the remaining memory quota is too small", func() {
 				It("should return itself", func() {
 					for trial := 0; trial < numTrials; trial++ {
-						Expect(MarshalRemTooSmall(t)).To(Succeed())
+						Expect(surgeutil.MarshalRemTooSmall(t)).To(Succeed())
 					}
 				})
 			})
@@ -80,7 +81,7 @@ var _ = Describe("Map", func() {
 			Context("when the buffer is too small", func() {
 				It("should return itself", func() {
 					for trial := 0; trial < numTrials; trial++ {
-						Expect(UnmarshalBufTooSmall(t)).To(Succeed())
+						Expect(surgeutil.UnmarshalBufTooSmall(t)).To(Succeed())
 					}
 				})
 			})
@@ -88,7 +89,7 @@ var _ = Describe("Map", func() {
 			Context("when the remaining memory quota is too small", func() {
 				It("should return itself", func() {
 					for trial := 0; trial < numTrials; trial++ {
-						Expect(UnmarshalRemTooSmall(t)).To(Succeed())
+						Expect(surgeutil.UnmarshalRemTooSmall(t)).To(Succeed())
 					}
 				})
 			})

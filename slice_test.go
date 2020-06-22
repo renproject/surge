@@ -5,6 +5,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/renproject/surge/surgeutil"
 )
 
 var _ = Describe("Slice", func() {
@@ -31,7 +32,7 @@ var _ = Describe("Slice", func() {
 		It("should return itself", func() {
 			for trial := 0; trial < numTrials; trial++ {
 				for _, t := range ts {
-					Expect(MarshalUnmarshalCheck(t)).To(Succeed())
+					Expect(surgeutil.MarshalUnmarshalCheck(t)).To(Succeed())
 				}
 			}
 		})
@@ -41,7 +42,7 @@ var _ = Describe("Slice", func() {
 		It("should not panic", func() {
 			for trial := 0; trial < numTrials; trial++ {
 				for _, t := range ts {
-					Expect(func() { FuzzCheck(t) }).ToNot(Panic())
+					Expect(func() { surgeutil.Fuzz(t) }).ToNot(Panic())
 				}
 			}
 		})
@@ -52,7 +53,7 @@ var _ = Describe("Slice", func() {
 			It("should return itself", func() {
 				for trial := 0; trial < numTrials; trial++ {
 					for _, t := range ts {
-						Expect(MarshalBufTooSmall(t)).To(Succeed())
+						Expect(surgeutil.MarshalBufTooSmall(t)).To(Succeed())
 					}
 				}
 			})
@@ -62,7 +63,7 @@ var _ = Describe("Slice", func() {
 			It("should return itself", func() {
 				for trial := 0; trial < numTrials; trial++ {
 					for _, t := range ts {
-						Expect(MarshalRemTooSmall(t)).To(Succeed())
+						Expect(surgeutil.MarshalRemTooSmall(t)).To(Succeed())
 					}
 				}
 			})
@@ -74,7 +75,7 @@ var _ = Describe("Slice", func() {
 			It("should return itself", func() {
 				for trial := 0; trial < numTrials; trial++ {
 					for _, t := range ts {
-						Expect(UnmarshalBufTooSmall(t)).To(Succeed())
+						Expect(surgeutil.UnmarshalBufTooSmall(t)).To(Succeed())
 					}
 				}
 			})
@@ -84,7 +85,7 @@ var _ = Describe("Slice", func() {
 			It("should return itself", func() {
 				for trial := 0; trial < numTrials; trial++ {
 					for _, t := range ts {
-						Expect(UnmarshalRemTooSmall(t)).To(Succeed())
+						Expect(surgeutil.UnmarshalRemTooSmall(t)).To(Succeed())
 					}
 				}
 			})
