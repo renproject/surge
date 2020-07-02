@@ -200,7 +200,7 @@ BenchmarkModelMarshalJSON-8                 7018            163255 ns/op        
 BenchmarkPointMarshal-8                 11212546               109 ns/op               0 B/op          0 allocs/op
 BenchmarkTriangleMarshal-8               3700579               294 ns/op               0 B/op          0 allocs/op
 BenchmarkModelMarshal-8                    38652             28270 ns/op              32 B/op          1 allocs/op
-BenchmarkFoo-8                          33130609                33.0 ns/op             0 B/op          0 allocs/op
+BenchmarkFoo-8                          33130609                33 ns/op               0 B/op          0 allocs/op
 ```
 
 ## Contributions
