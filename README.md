@@ -14,9 +14,11 @@ A library for fast binary (un)marshaling. Designed to be used in Byzantine netwo
 - [x] maps, and
 - [x] custom implementations (using the `Marshaler` and `Unmarshaler` interfaces).
 
-## Examples
+## Built-in Types
 
-For most use cases, `ToBinary` and `FromBinary` are the only functions that you will need to interact with:
+All built-in types that can be marshaled are supported by `surge`. And, for the vast majority of use cases, `ToBinary` and `FromBinary` are the only functions that you will need to use:
+
+### Scalars
 
 ```go
 // Marshal
@@ -33,17 +35,88 @@ if err := surge.FromBinary(&y, data); err != nil {
 }
 ```
 
-The same pattern works for custom struct too, without any changes:
+### Arrays
+
+Arrays are collections of a known, fixed, length. Arrays are *not* length prefixed, because their length is part of their type. All arrays marshal their elements one-by-one, with the exception of byte arrays (which are marshaled in bulk using `copy`):
+
+```go
+// Marshal
+x := [4]uint64{42, 43, 44, 45}
+data, err := surge.ToBinary(x)
+if err != nil {
+    panic(err)
+}
+
+// Unmarshal
+y := [4]uint64{}
+if err := surge.FromBinary(&y, data); err != nil {
+    panic(err)
+}
+```
+
+### Slices
+
+Slices are collections of variable length. Slices are length prefixed, because their length is not known at compile-time. All slices marshal their elements one-by-one, with the exception of byte slices (which are marshaled in bulk using `copy`):
+
+```go
+// Marshal
+x := []uint64{42, 43, 44, 45}
+data, err := surge.ToBinary(x)
+if err != nil {
+    panic(err)
+}
+
+// Unmarshal
+y := []uint64{}
+if err := surge.FromBinary(&y, data); err != nil {
+    panic(err)
+}
+```
+
+### Maps
+
+Maps are effectively slices of key/value pairs. Maps are length prefixed, because their length is not known at compile-time. Maps are marshaled as a sorted slice of `(key, value)` tuples, sorted lexographically by keys (after the key has been marshaled, because not all key types are directly comparable). Sorting is done because it guarantees that the binary output is always the same when the key/value pairs are the same (this is particularly useful when hashing/signing maps for authenticity):
+
+```go
+// Marshal
+x := map[string]uint64{"foo": 42, "bar": 43, "baz": 44}
+data, err := surge.ToBinary(x)
+if err != nil {
+    panic(err)
+}
+
+// Unmarshal
+y := map[string]uint64{}
+if err := surge.FromBinary(&y, data); err != nil {
+    panic(err)
+}
+```
+
+## User-defined types
+
+The same pattern that we have seen above works for custom structs too. You will *not* need to make any changes to your struct, as long as all of its fields are marshalable by `surge`:
 
 ```go
 type MyStruct struct {
-  Foo int64
-  Bar float64
-  Baz string
+    Foo int64
+    Bar float64
+    Baz MyInnerStruct
+}
+
+type MyInnerStruct struct {
+    Inner1 []bool
+    Inner2 []string
 }
 
 // Marshal
-x := MyStruct{ Foo: int64(43), Bar: float64(3.14), Baz: "baz" }
+x := MyStruct{
+    Foo: int64(43),
+    Bar: float64(3.14),
+    Baz: MyInnerStruct{
+        Inner1: []bool{true, false},
+        Inner2: []string{"hello", "world"},
+    },
+}
 data, err := surge.ToBinary(x)
 if err != nil {
     panic(err)
@@ -56,11 +129,11 @@ if err := surge.FromBinary(&y, data); err != nil {
 }
 ```
 
-## Custom Implementation
+## Specialisation
 
 Using the default marshaler built into `surge` is great for prototyping, and will good enough for many applications. But, sometimes we need to specialise our marshaling. Providing our own implementation will not only be faster, but it will also give us the ability to customise the marshaler (which can be necessary when thinking about backward compatibility, etc.):
 
-```
+```go
 type MyStruct struct {
   Foo int64
   Bar float64
