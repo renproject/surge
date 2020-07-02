@@ -129,7 +129,7 @@ if err := surge.FromBinary(&y, data); err != nil {
 }
 ```
 
-## Specialisation
+### Specialisation
 
 Using the default marshaler built into `surge` is great for prototyping, and will good enough for many applications. But, sometimes we need to specialise our marshaling. Providing our own implementation will not only be faster, but it will also give us the ability to customise the marshaler (which can be necessary when thinking about backward compatibility, etc.):
 
@@ -185,6 +185,55 @@ func (myStruct *MyStruct) Unmarshal(buf []byte, rem int) ([]byte, int, error) {
     return buf, rem, err
 }
 ```
+
+### Testing
+
+Testing custom marshaling implementations is incredibly important, but it can also be very tedious, and so it is rarely done as extensively as it should be. Luckily, `surge` helps us get this done quickly. By using the `surgeutil` package, we can write comprehensive tests very quickly:
+
+```go
+func TestMyStruct(t *testing.T) {
+    // Reflect on our custom type
+    t := reflect.TypeOf(MyStruct{})
+    
+    // Fuzz and expect that it does not panic.
+    surgeutil.Fuzz(t)
+    
+    // Marshal, then unmarshal, then check for
+    // equality, and expect there to be no
+    // errors.
+    if err := surgeutil.MarshalUnmarshalCheck(t); err != nil {
+        t.Fatalf("bad marshal/unmarshal/check: %v", err)
+    }
+    
+    // Marshal when the buffer is too small
+    // and check that it does not work.
+    if err := surgeutil.MarshalBufTooSmall(t); err != nil {
+        t.Fatalf("bad marshal with insufficient buffer: %v", err)
+    }
+    
+    // Marshal when the remaining memory quota
+    // is too small and check that it does not
+    // work.
+    if err := surgeutil.MarshalRemTooSmall(t); err != nil {
+        t.Fatalf("bad marshal with insufficient rem quota: %v", err)
+    }
+    
+    // Unmarshal when the buffer is too small
+    // and check that it does not work.
+    if err := surgeutil.UnmarshalBufTooSmall(t); err != nil {
+        t.Fatalf("bad marshal with insufficient buffer: %v", err)
+    }
+    
+    // Unmarshal when the remaining memory quota
+    // is too small and check that it does not
+    // work.
+    if err := surgeutil.UnmarshalRemTooSmall(t); err != nil {
+        t.Fatalf("bad marshal with insufficient rem quota: %v", err)
+    }
+}
+```
+
+For more examples of `surgeutil` in use, checkout any of the `*_test.go` files. All of the testing in `surge` is done using the `surgeutil` package.
 
 ## Benchmarks
 
