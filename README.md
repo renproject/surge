@@ -6,7 +6,7 @@
 
 [Documentation](https://godoc.org/github.com/renproject/surge)
 
-A library for fast binary (un)marshaling. Designed to be used in Byzantine networks, `🔌 surge` never explicitly panics, protects against malicious inputs, and makes minimal memory allocations. It supports the (un)marshaling of:
+A library for fast binary (un)marshaling. Designed to be used in Byzantine networks, `🔌 surge` never explicitly panics, protects against malicious inputs, allocates minimally, and has very few dependencies (its only dependency is the [`ginkgo`](https://onsi.github.io/ginkgo) testing framework). It supports the (un)marshaling of:
 
 - [x] scalars,
 - [x] arrays,
