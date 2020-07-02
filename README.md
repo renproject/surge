@@ -233,7 +233,7 @@ func TestMyStruct(t *testing.T) {
 }
 ```
 
-For more examples of `surgeutil` in use, checkout any of the `*_test.go` files. All of the testing in `surge` is done using the `surgeutil` package.
+Internally, `surgeutil` makes use of the [`quick`](https://golang.org/pkg/testing/quick) standard library. So, for `surgeutil` to work, your type needs to be compatible with `quick`. This is usually automatic, and most of the time you will not need to think about `quick` at all. For the more exotic types, that do need custom support, all you need to do is implement the (`quick.Generator`](https://golang.org/pkg/testing/quick/#Generator) interface. For more examples of `surgeutil` in use, checkout any of the `*_test.go` files. All of the testing in `surge` is done using the `surgeutil` package.
 
 ## Benchmarks
 
