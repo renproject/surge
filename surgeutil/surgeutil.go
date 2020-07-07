@@ -109,24 +109,14 @@ func UnmarshalBufTooSmall(t reflect.Type) error {
 		return fmt.Errorf("cannot generate value of type %v", t)
 	}
 	// Marshal the value so that we can attempt to unmarshal the resulting data
-	size := surge.SizeHint(x.Interface())
-	buf := make([]byte, size)
-	rem := size
-	if t.Kind() == reflect.Map {
-		// Maps take up extra memory quota when marshaling
-		rem = size + 48*x.Len()
-	}
-	if _, _, err := surge.Marshal(x.Interface(), buf, rem); err != nil {
+	buf, err := surge.ToBinary(x.Interface())
+	if err != nil {
 		return fmt.Errorf("unexpected error: %v", err)
 	}
 	// Unmarshal with buffers that are too small
-	if t.Kind() == reflect.Map {
-		// Maps take up extra memory quota when unmarshaling
-		rem = size + x.Len()*int(t.Key().Size()+t.Elem().Size())
-	}
-	for bufLen := 0; bufLen < size; bufLen++ {
+	for bufLen := 0; bufLen < len(buf); bufLen++ {
 		y := reflect.New(t)
-		if _, _, err := surge.Unmarshal(y.Interface(), buf[:bufLen], rem); err == nil {
+		if _, _, err := surge.Unmarshal(y.Interface(), buf[:bufLen], surge.MaxBytes); err == nil {
 			return fmt.Errorf("unexpected error: %v", err)
 		}
 	}
