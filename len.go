@@ -1,14 +1,12 @@
 package surge
 
-// MarshalLen marshalls the given slice length.
+// MarshalLen marshals the given slice length.
 func MarshalLen(l uint32, buf []byte, rem int) ([]byte, int, error) {
 	return MarshalU32(l, buf, rem)
 }
 
-// UnmarshalLen unmarshalls a slice length, checking that the total space
+// UnmarshalLen unmarshals a slice length, checking that the total space
 // required for the slice will not exceed rem.
-//
-// Panics: This function will panic if elemSize is 0.
 func UnmarshalLen(dst *uint32, elemSize int, buf []byte, rem int) ([]byte, int, error) {
 	var l uint32
 	buf, rem, err := UnmarshalU32(&l, buf, rem)
@@ -16,6 +14,9 @@ func UnmarshalLen(dst *uint32, elemSize int, buf []byte, rem int) ([]byte, int, 
 		return buf, rem, err
 	}
 
+	if elemSize < 1 {
+		elemSize = 1
+	}
 	var c uint64 = uint64(l) * uint64(elemSize)
 
 	// Check if there was overflow in the multiplication.
