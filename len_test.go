@@ -35,6 +35,12 @@ var _ = Describe("Slice length", func() {
 	})
 
 	Context("when unmarshaling", func() {
+		It("should not panic when the element size is zero", func() {
+			var bs [4]byte
+			var x uint32
+			Expect(func() { surge.UnmarshalLen(&x, 0, bs[:], surge.MaxBytes) }).ToNot(Panic())
+		})
+
 		It("should return an error when rem is too small", func() {
 			const maxLen uint32 = 1000
 
