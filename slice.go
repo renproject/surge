@@ -4,12 +4,19 @@ import (
 	"reflect"
 )
 
+// SizeHintBytes is the number of bytes required to represent the given byte
+// slice in binary.
 func SizeHintBytes(v []byte) int {
-	return 2 + len(v)
+	return SizeHintU32 + len(v)
 }
 
+// MarshalBytes into a byte slice. It will not consume more memory than the
+// remaining memory quota (either through writes, or in-memory allocations). It
+// will return the unconsumed tail of the byte slice, and the remaining memory
+// quota. An error is returned if the byte slice is too small, or if the
+// remainin memory quote is insufficient.
 func MarshalBytes(v []byte, buf []byte, rem int) ([]byte, int, error) {
-	buf, rem, err := MarshalU16(uint16(len(v)), buf, rem)
+	buf, rem, err := MarshalLen(uint32(len(v)), buf, rem)
 	if err != nil {
 		return buf, rem, err
 	}
@@ -22,14 +29,19 @@ func MarshalBytes(v []byte, buf []byte, rem int) ([]byte, int, error) {
 	return buf, rem, nil
 }
 
+// UnmarshalBytes from a byte slice. It will not consume more memory than the
+// remaining memory quota (either through reads, or in-memory allocations). It
+// will return the unconsumed tail of the byte slice, and the remaining memory
+// quota. An error is returned if the byte slice is too small, or if the
+// remainin memory quote is insufficient.
 func UnmarshalBytes(v *[]byte, buf []byte, rem int) ([]byte, int, error) {
-	vLen := uint16(0)
-	buf, rem, err := UnmarshalU16(&vLen, buf, rem)
+	vLen := uint32(0)
+	buf, rem, err := UnmarshalLen(&vLen, 1, buf, rem)
 	if err != nil {
 		return buf, rem, err
 	}
 
-	if len(buf) < int(vLen) || rem < int(vLen) {
+	if len(buf) < int(vLen) {
 		return buf, rem, ErrUnexpectedEndOfBuffer
 	}
 	*v = make([]byte, vLen)
@@ -41,7 +53,7 @@ func UnmarshalBytes(v *[]byte, buf []byte, rem int) ([]byte, int, error) {
 }
 
 func sizeHintReflectedSlice(v reflect.Value) int {
-	sizeHint := 2
+	sizeHint := SizeHintU32
 	for i := 0; i < v.Len(); i++ {
 		sizeHint += sizeHintReflected(v.Index(i))
 	}
@@ -49,7 +61,7 @@ func sizeHintReflectedSlice(v reflect.Value) int {
 }
 
 func marshalReflectedSlice(v reflect.Value, buf []byte, rem int) ([]byte, int, error) {
-	buf, rem, err := MarshalU16(uint16(v.Len()), buf, rem)
+	buf, rem, err := MarshalLen(uint32(v.Len()), buf, rem)
 	if err != nil {
 		return buf, rem, err
 	}
@@ -62,24 +74,17 @@ func marshalReflectedSlice(v reflect.Value, buf []byte, rem int) ([]byte, int, e
 }
 
 func unmarshalReflectedSlice(v reflect.Value, buf []byte, rem int) ([]byte, int, error) {
-	sliceLen := uint16(0)
-	buf, rem, err := UnmarshalU16(&sliceLen, buf, rem)
+	sliceLen := uint32(0)
+	elem := v.Elem()
+	size := int(elem.Type().Elem().Size())
+	buf, rem, err := UnmarshalLen(&sliceLen, size, buf, rem)
 	if err != nil {
 		return buf, rem, err
 	}
-
-	elem := v.Elem()
-	n := int(sliceLen) * int(elem.Type().Elem().Size())
-	if n < 0 {
-		return buf, rem, ErrLengthOverflow
-	}
-	if rem < n {
-		return buf, rem, ErrUnexpectedEndOfBuffer
-	}
-	rem -= n
+	rem -= int(sliceLen) * size
 
 	elem.Set(reflect.MakeSlice(elem.Type(), int(sliceLen), int(sliceLen)))
-	for i := uint16(0); i < sliceLen; i++ {
+	for i := uint32(0); i < sliceLen; i++ {
 		if buf, rem, err = unmarshalReflected(elem.Index(int(i)).Addr(), buf, rem); err != nil {
 			return buf, rem, err
 		}

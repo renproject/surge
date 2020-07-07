@@ -4,12 +4,19 @@ import (
 	"strings"
 )
 
+// SizeHintString is the number of bytes required to represent the given string
+// in binary.
 func SizeHintString(v string) int {
-	return 2 + len(v)
+	return SizeHintU32 + len(v)
 }
 
+// MarshalString into a byte slice. It will not consume more memory than the
+// remaining memory quota (either through writes, or in-memory allocations). It
+// will return the unconsumed tail of the byte slice, and the remaining memory
+// quota. An error is returned if the byte slice is too small, or if the
+// remainin memory quote is insufficient.
 func MarshalString(v string, buf []byte, rem int) ([]byte, int, error) {
-	buf, rem, err := MarshalU16(uint16(len(v)), buf, rem)
+	buf, rem, err := MarshalLen(uint32(len(v)), buf, rem)
 	if err != nil {
 		return buf, rem, err
 	}
@@ -20,14 +27,19 @@ func MarshalString(v string, buf []byte, rem int) ([]byte, int, error) {
 	return buf[n:], rem - n, nil
 }
 
+// UnmarshalString from a byte slice. It will not consume more memory than the
+// remaining memory quota (either through reads, or in-memory allocations). It
+// will return the unconsumed tail of the byte slice, and the remaining memory
+// quota. An error is returned if the byte slice is too small, or if the
+// remainin memory quote is insufficient.
 func UnmarshalString(v *string, buf []byte, rem int) ([]byte, int, error) {
-	strLen := uint16(0)
-	buf, rem, err := UnmarshalU16(&strLen, buf, rem)
+	strLen := uint32(0)
+	buf, rem, err := UnmarshalLen(&strLen, 1, buf, rem)
 	if err != nil {
 		return buf, rem, err
 	}
 	n := int(strLen)
-	if len(buf) < n || rem < n {
+	if len(buf) < n {
 		return buf, rem, ErrUnexpectedEndOfBuffer
 	}
 	b := strings.Builder{}

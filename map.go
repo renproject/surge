@@ -7,7 +7,7 @@ import (
 )
 
 func sizeHintReflectedMap(v reflect.Value) int {
-	sizeHint := 2
+	sizeHint := SizeHintU32
 	iter := v.MapRange()
 	for iter.Next() {
 		sizeHint += sizeHintReflected(iter.Key())
@@ -17,7 +17,7 @@ func sizeHintReflectedMap(v reflect.Value) int {
 }
 
 func marshalReflectedMap(v reflect.Value, buf []byte, rem int) ([]byte, int, error) {
-	buf, rem, err := MarshalU16(uint16(v.Len()), buf, rem)
+	buf, rem, err := MarshalLen(uint32(v.Len()), buf, rem)
 	if err != nil {
 		return buf, rem, err
 	}
@@ -109,29 +109,22 @@ func marshalReflectedMap(v reflect.Value, buf []byte, rem int) ([]byte, int, err
 func unmarshalReflectedMap(v reflect.Value, buf []byte, rem int) ([]byte, int, error) {
 	var err error
 
-	mapLen := uint16(0)
-	if buf, rem, err = UnmarshalU16(&mapLen, buf, rem); err != nil {
+	mapLen := uint32(0)
+	elem := v.Elem()
+	size := int(elem.Type().Key().Size() + elem.Type().Elem().Size())
+	if buf, rem, err = UnmarshalLen(&mapLen, size, buf, rem); err != nil {
 		return buf, rem, err
 	}
-
-	elem := v.Elem()
-	n := int(mapLen) * int(elem.Type().Key().Size()+elem.Type().Elem().Size())
-	if n < 0 {
-		return buf, rem, ErrLengthOverflow
-	}
-	if rem < n {
-		return buf, rem, ErrUnexpectedEndOfBuffer
-	}
-	rem -= n
+	rem -= int(mapLen) * size
 	elem.Set(reflect.MakeMapWithSize(elem.Type(), int(mapLen)))
 
-	for i := uint16(0); i < mapLen; i++ {
+	for i := uint32(0); i < mapLen; i++ {
 		k := reflect.New(elem.Type().Key())
 		v := reflect.New(elem.Type().Elem())
-		if buf, rem, err = unmarshalReflected(k, buf, rem); err != nil {	
+		if buf, rem, err = unmarshalReflected(k, buf, rem); err != nil {
 			return buf, rem, err
 		}
-		if buf, rem, err = unmarshalReflected(v, buf, rem); err != nil {	
+		if buf, rem, err = unmarshalReflected(v, buf, rem); err != nil {
 			return buf, rem, err
 		}
 		elem.SetMapIndex(reflect.Indirect(k), reflect.Indirect(v))
