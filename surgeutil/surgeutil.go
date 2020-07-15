@@ -136,18 +136,14 @@ func UnmarshalRemTooSmall(t reflect.Type) error {
 	// Marshal the value so that we can attempt to unmarshal the resulting data
 	size := surge.SizeHint(x.Interface())
 	buf := make([]byte, size)
-	rem := size
-	if t.Kind() == reflect.Map {
-		// Maps take up extra memory quota when marshaling
-		rem = size + 48*x.Len()
-	}
-	if _, _, err := surge.Marshal(x.Interface(), buf, rem); err != nil {
+	if _, _, err := surge.Marshal(x.Interface(), buf, surge.MaxBytes); err != nil {
 		return fmt.Errorf("unexpected error: %v", err)
 	}
 	// Unmarshal with memory quotas that are too small
+	rem := size
 	if t.Kind() == reflect.Map {
 		// Maps take up extra memory quota when unmarshaling
-		rem = size + x.Len()*int(t.Key().Size()+t.Elem().Size())
+		rem += x.Len() * int(t.Key().Size()+t.Elem().Size())
 	}
 	for rem2 := 0; rem2 < rem; rem2++ {
 		y := reflect.New(t)
