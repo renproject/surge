@@ -141,7 +141,7 @@ func UnmarshalRemTooSmall(t reflect.Type) error {
 		// Maps take up extra memory quota when marshaling
 		rem = size + 48*x.Len()
 	}
-	if _, _, err := surge.Marshal(x.Interface(), buf, rem); err != nil {
+	if _, _, err := surge.Marshal(x.Interface(), buf, surge.MaxBytes); err != nil {
 		return fmt.Errorf("unexpected error: %v", err)
 	}
 	// Unmarshal with memory quotas that are too small
