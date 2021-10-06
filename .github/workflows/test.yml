@@ -34,6 +34,7 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE
           export PATH=$PATH:$(go env GOPATH)/bin
+          go get -u github.com/onsi/gomega/...
           go get -u github.com/mattn/goveralls
           go test --cover --coverprofile surge.coverprofile
           goveralls -coverprofile=surge.coverprofile -service=circleci -repotoken $COVERALLS_TOKEN
