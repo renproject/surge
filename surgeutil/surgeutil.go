@@ -55,21 +55,56 @@ func Fuzz(t reflect.Type) {
 	}
 }
 
-// MarshalBufTooSmall generates a random intance of a type, and then attempts to
-// marshal it into a buffer that is too small. It returns an error when
-// marshaling succeeds. Otherwise, it returns nil.
-func MarshalBufTooSmall(t reflect.Type) error {
-	// Generate value
+// MarshalBufTooSmallSparse generates a random intance of a type, and then
+// attempts to marshal it into a buffer that is too small. It returns an error
+// when marshaling succeeds. Otherwise, it returns nil.
+//
+// The number of buffer sizes tested is determinted by the given integer. A
+// value of 0 means that all buffer sizes will be tested.
+func MarshalBufTooSmallSparse(t reflect.Type, steps int) error {
 	x, ok := quick.Value(t, rand.New(rand.NewSource(time.Now().UnixNano())))
 	if !ok {
 		return fmt.Errorf("cannot generate value of type %v", t)
 	}
-	// Generate buffer that is too small
+
 	size := surge.SizeHint(x.Interface())
-	// Marshal
-	for bufLen := 0; bufLen < size; bufLen++ {
-		buf := make([]byte, bufLen)
+	step := stepSize(size, steps)
+	fullBuf := make([]byte, size)
+	for bufLen := 0; bufLen < size; bufLen += step {
+		buf := fullBuf[:bufLen]
 		rem := size
+		if _, _, err := surge.Marshal(x.Interface(), buf, rem); err == nil {
+			return fmt.Errorf("unexpected success: %v < %v", bufLen, size)
+		}
+	}
+	return nil
+}
+
+// MarshalBufTooSmall generates a random intance of a type, and then attempts to
+// marshal it into a buffer that is too small. It returns an error when
+// marshaling succeeds. Otherwise, it returns nil.
+//
+// Equivalent to MarshalBufTooSmallSparse(t, 0).
+func MarshalBufTooSmall(t reflect.Type) error {
+	return MarshalBufTooSmallSparse(t, 0)
+}
+
+// MarshalRemTooSmallSparse generates a random intance of a type, and then
+// attempts to marshal when a remaining memory quota that is too small. It
+// returns an error when marshaling succeeds. Otherwise, it returns nil.
+//
+// The number of buffer sizes tested is determinted by the given integer. A
+// value of 0 means that all buffer sizes will be tested.
+func MarshalRemTooSmallSparse(t reflect.Type, steps int) error {
+	x, ok := quick.Value(t, rand.New(rand.NewSource(time.Now().UnixNano())))
+	if !ok {
+		return fmt.Errorf("cannot generate value of type %v", t)
+	}
+
+	size := surge.SizeHint(x.Interface())
+	step := stepSize(size, steps)
+	buf := make([]byte, size)
+	for rem := 0; rem < size; rem += step {
 		if _, _, err := surge.Marshal(x.Interface(), buf, rem); err == nil {
 			return fmt.Errorf("unexpected error: %v", err)
 		}
@@ -80,19 +115,35 @@ func MarshalBufTooSmall(t reflect.Type) error {
 // MarshalRemTooSmall generates a random intance of a type, and then attempts to
 // marshal when a remaining memory quota that is too small. It returns an error
 // when marshaling succeeds. Otherwise, it returns nil.
+//
+// Equivalent to MarshalRemTooSmallSparse(t, 0).
 func MarshalRemTooSmall(t reflect.Type) error {
-	// Generate value
+	return MarshalRemTooSmallSparse(t, 0)
+}
+
+// UnmarshalBufTooSmallSparse generates a random intance of a type, marshals it
+// into binary, and then attempts to unmarshal the result with a buffer that is
+// too small. It returns an error when marshaling succeeds. Otherwise, it
+// returns nil.
+//
+// The number of buffer sizes tested is determinted by the given integer. A
+// value of 0 means that all buffer sizes will be tested.
+func UnmarshalBufTooSmallSparse(t reflect.Type, steps int) error {
 	x, ok := quick.Value(t, rand.New(rand.NewSource(time.Now().UnixNano())))
 	if !ok {
 		return fmt.Errorf("cannot generate value of type %v", t)
 	}
-	// Generate buffer that is too small
-	size := surge.SizeHint(x.Interface())
-	// Marshal
-	for rem := 0; rem < size; rem++ {
-		buf := make([]byte, size)
-		if _, _, err := surge.Marshal(x.Interface(), buf, rem); err == nil {
-			return fmt.Errorf("unexpected error: %v", err)
+
+	buf, err := surge.ToBinary(x.Interface())
+	if err != nil {
+		return fmt.Errorf("unexpected error: %v", err)
+	}
+
+	step := stepSize(len(buf), steps)
+	y := reflect.New(t)
+	for bufLen := 0; bufLen < len(buf); bufLen += step {
+		if _, _, err := surge.Unmarshal(y.Interface(), buf[:bufLen], surge.MaxBytes); err == nil {
+			return fmt.Errorf("unexpected success: %v < %v", bufLen, len(buf))
 		}
 	}
 	return nil
@@ -102,22 +153,42 @@ func MarshalRemTooSmall(t reflect.Type) error {
 // binary, and then attempts to unmarshal the result with a buffer that is too
 // small. It returns an error when marshaling succeeds. Otherwise, it returns
 // nil.
+//
+// Equivalent to UnmarshalBufTooSmallSparse(t, 0).
 func UnmarshalBufTooSmall(t reflect.Type) error {
-	// Generate value
+	return UnmarshalBufTooSmallSparse(t, 0)
+}
+
+// UnmarshalRemTooSmallSparse generates a random intance of a type, marshals it
+// into binary, and then attempts to unmarshal the result with a remaining
+// memory quota that is too small. It returns an error when marshaling
+// succeeds.  Otherwise, it returns nil.
+//
+// The number of buffer sizes tested is determinted by the given integer. A
+// value of 0 means that all buffer sizes will be tested.
+func UnmarshalRemTooSmallSparse(t reflect.Type, steps int) error {
 	x, ok := quick.Value(t, rand.New(rand.NewSource(time.Now().UnixNano())))
 	if !ok {
 		return fmt.Errorf("cannot generate value of type %v", t)
 	}
-	// Marshal the value so that we can attempt to unmarshal the resulting data
-	buf, err := surge.ToBinary(x.Interface())
-	if err != nil {
+
+	size := surge.SizeHint(x.Interface())
+	buf := make([]byte, size)
+	if _, _, err := surge.Marshal(x.Interface(), buf, surge.MaxBytes); err != nil {
 		return fmt.Errorf("unexpected error: %v", err)
 	}
-	// Unmarshal with buffers that are too small
-	for bufLen := 0; bufLen < len(buf); bufLen++ {
-		y := reflect.New(t)
-		if _, _, err := surge.Unmarshal(y.Interface(), buf[:bufLen], surge.MaxBytes); err == nil {
-			return fmt.Errorf("unexpected error: %v", err)
+
+	rem := size
+	if t.Kind() == reflect.Map {
+		// Maps take up extra memory quota when unmarshaling
+		rem += x.Len() * int(t.Key().Size()+t.Elem().Size())
+	}
+
+	step := stepSize(rem, steps)
+	y := reflect.New(t)
+	for rem2 := 0; rem2 < rem; rem2 += step {
+		if _, _, err := surge.Unmarshal(y.Interface(), buf, rem2); err == nil {
+			return fmt.Errorf("unexpected success: %v < %v", rem2, rem)
 		}
 	}
 	return nil
@@ -127,29 +198,21 @@ func UnmarshalBufTooSmall(t reflect.Type) error {
 // binary, and then attempts to unmarshal the result with a remaining memory
 // quota that is too small. It returns an error when marshaling succeeds.
 // Otherwise, it returns nil.
+//
+// Equivalent to UnmarshalRemTooSmallSparse(t, 0).
 func UnmarshalRemTooSmall(t reflect.Type) error {
-	// Generate value
-	x, ok := quick.Value(t, rand.New(rand.NewSource(time.Now().UnixNano())))
-	if !ok {
-		return fmt.Errorf("cannot generate value of type %v", t)
-	}
-	// Marshal the value so that we can attempt to unmarshal the resulting data
-	size := surge.SizeHint(x.Interface())
-	buf := make([]byte, size)
-	if _, _, err := surge.Marshal(x.Interface(), buf, surge.MaxBytes); err != nil {
-		return fmt.Errorf("unexpected error: %v", err)
-	}
-	// Unmarshal with memory quotas that are too small
-	rem := size
-	if t.Kind() == reflect.Map {
-		// Maps take up extra memory quota when unmarshaling
-		rem += x.Len() * int(t.Key().Size()+t.Elem().Size())
-	}
-	for rem2 := 0; rem2 < rem; rem2++ {
-		y := reflect.New(t)
-		if _, _, err := surge.Unmarshal(y.Interface(), buf, rem2); err == nil {
-			return fmt.Errorf("unexpected error: %v", err)
+	return UnmarshalRemTooSmallSparse(t, 0)
+}
+
+func stepSize(max, steps int) int {
+	var step int
+	if steps == 0 {
+		step = 1
+	} else {
+		step = max / steps
+		if step < 1 {
+			step = 1
 		}
 	}
-	return nil
+	return step
 }

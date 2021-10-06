@@ -1,9 +1,5 @@
 package surge
 
-import (
-	"strings"
-)
-
 // SizeHintString is the number of bytes required to represent the given string
 // in binary.
 func SizeHintString(v string) int {
@@ -42,10 +38,7 @@ func UnmarshalString(v *string, buf []byte, rem int) ([]byte, int, error) {
 	if len(buf) < n {
 		return buf, rem, ErrUnexpectedEndOfBuffer
 	}
-	b := strings.Builder{}
-	if _, err := b.Write(buf[:n]); err != nil {
-		return buf[:n], rem - n, err
-	}
-	*v = b.String()
-	return buf[n:], rem - n, nil
+	strBuf, bufRem := buf[:n], buf[n:]
+	*v = string(strBuf)
+	return bufRem, rem - n, nil
 }
