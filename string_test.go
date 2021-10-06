@@ -2,9 +2,11 @@ package surge_test
 
 import (
 	"reflect"
+	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/renproject/surge"
 	"github.com/renproject/surge/surgeutil"
 )
 
@@ -80,3 +82,14 @@ var _ = Describe("String", func() {
 		})
 	})
 })
+
+func BenchmarkUnmarshalString(b *testing.B) {
+	size := 20
+	buf := make([]byte, size)
+	buf, _, _ = surge.MarshalLen(uint32(size-surge.SizeHintU32), buf, size)
+	var str string
+
+	for i := 0; i < b.N; i++ {
+		surge.UnmarshalString(&str, buf, size)
+	}
+}
