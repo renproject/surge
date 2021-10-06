@@ -19,13 +19,13 @@ jobs:
           cd $GITHUB_WORKSPACE
           export PATH=$PATH:$(go env GOPATH)/bin
           cd $GITHUB_WORKSPACE
+          go mod tidy
           go vet ./...
       - name: Run linting
         run: |
           cd $GITHUB_WORKSPACE
           export PATH=$PATH:$(go env GOPATH)/bin
           go get -u golang.org/x/lint/golint
-          go vet ./...
           golint ./...
       - name: Run tests
         env:
