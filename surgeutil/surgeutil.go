@@ -68,13 +68,7 @@ func MarshalBufTooSmallSparse(t reflect.Type, steps int) error {
 	}
 
 	size := surge.SizeHint(x.Interface())
-	var step int
-	if steps == 0 {
-		step = 1
-	} else {
-		step = size / steps
-	}
-
+	step := stepSize(size, steps)
 	fullBuf := make([]byte, size)
 	for bufLen := 0; bufLen < size; bufLen += step {
 		buf := fullBuf[:bufLen]
@@ -108,14 +102,7 @@ func MarshalRemTooSmallSparse(t reflect.Type, steps int) error {
 	}
 
 	size := surge.SizeHint(x.Interface())
-
-	var step int
-	if steps == 0 {
-		step = 1
-	} else {
-		step = size / steps
-	}
-
+	step := stepSize(size, steps)
 	buf := make([]byte, size)
 	for rem := 0; rem < size; rem += step {
 		if _, _, err := surge.Marshal(x.Interface(), buf, rem); err == nil {
@@ -152,13 +139,7 @@ func UnmarshalBufTooSmallSparse(t reflect.Type, steps int) error {
 		return fmt.Errorf("unexpected error: %v", err)
 	}
 
-	var step int
-	if steps == 0 {
-		step = 1
-	} else {
-		step = len(buf) / steps
-	}
-
+	step := stepSize(len(buf), steps)
 	y := reflect.New(t)
 	for bufLen := 0; bufLen < len(buf); bufLen += step {
 		if _, _, err := surge.Unmarshal(y.Interface(), buf[:bufLen], surge.MaxBytes); err == nil {
@@ -203,13 +184,7 @@ func UnmarshalRemTooSmallSparse(t reflect.Type, steps int) error {
 		rem += x.Len() * int(t.Key().Size()+t.Elem().Size())
 	}
 
-	var step int
-	if steps == 0 {
-		step = 1
-	} else {
-		step = rem / steps
-	}
-
+	step := stepSize(rem, steps)
 	y := reflect.New(t)
 	for rem2 := 0; rem2 < rem; rem2 += step {
 		if _, _, err := surge.Unmarshal(y.Interface(), buf, rem2); err == nil {
@@ -227,4 +202,17 @@ func UnmarshalRemTooSmallSparse(t reflect.Type, steps int) error {
 // Equivalent to UnmarshalRemTooSmallSparse(t, 0).
 func UnmarshalRemTooSmall(t reflect.Type) error {
 	return UnmarshalRemTooSmallSparse(t, 0)
+}
+
+func stepSize(max, steps int) int {
+	var step int
+	if steps == 0 {
+		step = 1
+	} else {
+		step = max / steps
+		if step < 1 {
+			step = 1
+		}
+	}
+	return step
 }
